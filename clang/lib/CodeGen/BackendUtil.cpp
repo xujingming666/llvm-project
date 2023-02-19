@@ -91,6 +91,8 @@
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include <memory>
+#include <iostream>
+
 using namespace clang;
 using namespace llvm;
 
@@ -576,6 +578,7 @@ void EmitAssemblyHelper::CreateTargetMachine(bool MustCreateTM) {
   if (!initTargetOptions(Diags, Options, CodeGenOpts, TargetOpts, LangOpts,
                          HSOpts))
     return;
+  std::cout << "TargetOpts.CPU" << TargetOpts.CPU << std::endl;
   TM.reset(TheTarget->createTargetMachine(Triple, TargetOpts.CPU, FeaturesStr,
                                           Options, RM, CM, OptLevel));
 }

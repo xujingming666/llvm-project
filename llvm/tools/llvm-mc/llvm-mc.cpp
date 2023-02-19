@@ -231,6 +231,7 @@ static cl::opt<ActionType> Action(
 
 static const Target *GetTarget(const char *ProgName) {
   // Figure out the target triple.
+  llvm::errs()<< "TripleName:" << TripleName << "\n";
   if (TripleName.empty())
     TripleName = sys::getDefaultTargetTriple();
   Triple TheTriple(Triple::normalize(TripleName));
@@ -366,6 +367,7 @@ int main(int argc, char **argv) {
   setDwarfDebugProducer();
 
   const char *ProgName = argv[0];
+  llvm::errs() << "ProgName : " << ProgName << "\n";
   const Target *TheTarget = GetTarget(ProgName);
   if (!TheTarget)
     return 1;

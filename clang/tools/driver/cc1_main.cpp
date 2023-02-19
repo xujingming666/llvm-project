@@ -218,9 +218,14 @@ int cc1_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {
     llvm::timeTraceProfilerInitialize(
         Clang->getFrontendOpts().TimeTraceGranularity, Argv0);
   }
+
+  llvm::errs() << "xujing22";
   // --print-supported-cpus takes priority over the actual compilation.
-  if (Clang->getFrontendOpts().PrintSupportedCPUs)
+  if (Clang->getFrontendOpts().PrintSupportedCPUs){
+    llvm::errs() << "xujing1" << Clang->getTargetOpts().CPU;
     return PrintSupportedCPUs(Clang->getTargetOpts().Triple);
+  }
+    
 
   // Infer the builtin include path if unspecified.
   if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&

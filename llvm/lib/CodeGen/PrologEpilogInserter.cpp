@@ -1308,9 +1308,14 @@ void PEI::insertZeroCallUsedRegs(MachineFunction &MF) {
       TFI.emitZeroCallUsedRegs(RegsToZero, MBB);
 }
 
+#include <iostream>
+
 /// replaceFrameIndices - Replace all MO_FrameIndex operands with physical
 /// register references and actual offsets.
 void PEI::replaceFrameIndices(MachineFunction &MF) {
+  
+  std::cout << "gogogogo xxxxx" << std::endl;
+
   const auto &ST = MF.getSubtarget();
   const TargetFrameLowering &TFI = *ST.getFrameLowering();
   if (!TFI.needsFrameIndexResolution(MF))
@@ -1365,7 +1370,7 @@ void PEI::replaceFrameIndices(MachineBasicBlock *BB, MachineFunction &MF,
     RS->enterBasicBlock(*BB);
 
   bool InsideCallSequence = false;
-
+  std::cout << ";;;;;;" << BB->size() << std::endl;
   for (MachineBasicBlock::iterator I = BB->begin(); I != BB->end(); ) {
     if (TII.isFrameInstr(*I)) {
       InsideCallSequence = TII.isFrameSetup(*I);
@@ -1377,6 +1382,9 @@ void PEI::replaceFrameIndices(MachineBasicBlock *BB, MachineFunction &MF,
     MachineInstr &MI = *I;
     bool DoIncr = true;
     bool DidFinishLoop = true;
+    
+    MI.print(llvm::errs());
+
     for (unsigned i = 0, e = MI.getNumOperands(); i != e; ++i) {
       if (!MI.getOperand(i).isFI())
         continue;

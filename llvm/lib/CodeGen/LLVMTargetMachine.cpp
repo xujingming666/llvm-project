@@ -57,8 +57,8 @@ void LLVMTargetMachine::initAsmInfo() {
   // we'll crash later.
   // Provide the user with a useful error message about what's wrong.
   assert(TmpAsmInfo && "MCAsmInfo not initialized. "
-         "Make sure you include the correct TargetSelect.h"
-         "and that InitializeAllTargetMCs() is being invoked!");
+                       "Make sure you include the correct TargetSelect.h"
+                       "and that InitializeAllTargetMCs() is being invoked!");
 
   if (Options.BinutilsVersion.first > 0)
     TmpAsmInfo->setBinutilsVersion(Options.BinutilsVersion);
@@ -230,18 +230,23 @@ bool LLVMTargetMachine::addPassesToEmitFile(
     MMIWP = new MachineModuleInfoWrapperPass(this);
   TargetPassConfig *PassConfig =
       addPassesToGenerateCode(*this, PM, DisableVerify, *MMIWP);
+  llvm::errs() << "addPassesToEmitFile1 \n";    
   if (!PassConfig)
     return true;
 
+  llvm::errs() << "addPassesToEmitFile2 \n";
   if (TargetPassConfig::willCompleteCodeGenPipeline()) {
-    if (addAsmPrinter(PM, Out, DwoOut, FileType, MMIWP->getMMI().getContext()))
+    if (addAsmPrinter(PM, Out, DwoOut, FileType,
+                      MMIWP->getMMI().getContext())) {
+      llvm::errs() << "addPassesToEmitFile3 \n";
       return true;
+    }
   } else {
     // MIR printing is redundant with -filetype=null.
     if (FileType != CGFT_Null)
       PM.add(createPrintMIRPass(Out));
   }
-
+  llvm::errs() << "addPassesToEmitFile4 \n";
   PM.add(createFreeMachineFunctionPass());
   return false;
 }

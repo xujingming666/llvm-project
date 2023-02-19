@@ -1213,6 +1213,8 @@ StringRef ELFObjectFile<ELFT>::getFileFormatName() const {
       return "elf32-amdgpu";
     case ELF::EM_LOONGARCH:
       return "elf32-loongarch";
+    case ELF::EM_DUMMY:
+      return "elf32-dummy";
     default:
       return "elf32-unknown";
     }
@@ -1336,7 +1338,8 @@ template <class ELFT> Triple::ArchType ELFObjectFile<ELFT>::getArch() const {
     default:
       report_fatal_error("Invalid ELFCLASS!");
     }
-
+  case ELF::EM_DUMMY:
+    return Triple::dummy;
   default:
     return Triple::UnknownArch;
   }

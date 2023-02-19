@@ -41,10 +41,11 @@
 #include "Targets/WebAssembly.h"
 #include "Targets/X86.h"
 #include "Targets/XCore.h"
+#include "Targets/Dummy.h"
 #include "clang/Basic/Diagnostic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
-
+#include <iostream>
 using namespace clang;
 
 namespace clang {
@@ -686,6 +687,10 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
     default:
       return new LoongArch64TargetInfo(Triple, Opts);
     }
+  case llvm::Triple::dummy:
+
+    std::cout << "gogo" << std::endl;
+    return new DummyTargetInfo(Triple, Opts);
   }
 }
 } // namespace targets
@@ -697,6 +702,7 @@ using namespace clang::targets;
 TargetInfo *
 TargetInfo::CreateTargetInfo(DiagnosticsEngine &Diags,
                              const std::shared_ptr<TargetOptions> &Opts) {
+  std::cout << "xxxxxxxxxxx" << std::endl;
   llvm::Triple Triple(Opts->Triple);
 
   // Construct the target

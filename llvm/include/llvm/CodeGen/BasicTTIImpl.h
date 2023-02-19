@@ -471,11 +471,12 @@ public:
   }
 
   bool shouldBuildRelLookupTables() const {
+    llvm::errs() << "xujing1 \n";
     const TargetMachine &TM = getTLI()->getTargetMachine();
     // If non-PIC mode, do not generate a relative lookup table.
     if (!TM.isPositionIndependent())
       return false;
-
+    llvm::errs() << "xujing2 \n";
     /// Relative lookup table entries consist of 32-bit offsets.
     /// Do not generate relative lookup tables for large code models
     /// in 64-bit achitectures where 32-bit offsets might not be enough.
@@ -483,15 +484,18 @@ public:
         TM.getCodeModel() == CodeModel::Large)
       return false;
 
+    llvm::errs() << "xujing3 \n";
     Triple TargetTriple = TM.getTargetTriple();
     if (!TargetTriple.isArch64Bit())
       return false;
 
+    llvm::errs() << "xujing4 \n";
     // TODO: Triggers issues on aarch64 on darwin, so temporarily disable it
     // there.
     if (TargetTriple.getArch() == Triple::aarch64 && TargetTriple.isOSDarwin())
       return false;
 
+    llvm::errs() << "xujing5 \n";
     return true;
   }
 

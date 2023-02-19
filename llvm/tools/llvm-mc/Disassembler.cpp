@@ -163,6 +163,7 @@ int Disassembler::disassemble(const Target &T, const std::string &Triple,
   // Convert the input to a vector for disassembly.
   ByteArrayTy ByteArray;
   StringRef Str = Buffer.getBuffer();
+  llvm::errs() << "Str:" << Str << "\n";  
   bool InAtomicBlock = false;
 
   while (SkipToToken(Str)) {

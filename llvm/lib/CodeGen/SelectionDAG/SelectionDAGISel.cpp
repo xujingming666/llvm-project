@@ -464,12 +464,14 @@ bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
     // This performs initialization so lowering for SplitCSR will be correct.
     TLI->initializeSplitCSR(EntryMBB);
 
+  llvm::errs() << "SelectAllBasicBlocks before \n";
   SelectAllBasicBlocks(Fn);
+  llvm::errs() << "SelectAllBasicBlocks after \n";
   if (FastISelFailed && EnableFastISelFallbackReport) {
     DiagnosticInfoISelFallback DiagFallback(Fn);
     Fn.getContext().diagnose(DiagFallback);
   }
-
+  llvm::errs() << "SelectAllBasicBlocks after1 \n";
   // Replace forward-declared registers with the registers containing
   // the desired value.
   // Note: it is important that this happens **before** the call to
@@ -502,13 +504,13 @@ bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
       MRI.clearKillFlags(From);
     MRI.replaceRegWith(From, To);
   }
-
+  llvm::errs() << "SelectAllBasicBlocks after2 \n";
   // If the first basic block in the function has live ins that need to be
   // copied into vregs, emit the copies into the top of the block before
   // emitting the code for the block.
   const TargetRegisterInfo &TRI = *MF->getSubtarget().getRegisterInfo();
   RegInfo->EmitLiveInCopies(EntryMBB, TRI, *TII);
-
+  llvm::errs() << "SelectAllBasicBlocks after3 \n";
   // Insert copies in the entry block and the return blocks.
   if (FuncInfo->SplitCSR) {
     SmallVector<MachineBasicBlock*, 4> Returns;
@@ -525,13 +527,13 @@ bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
     }
     TLI->insertCopiesSplitCSR(EntryMBB, Returns);
   }
-
+  llvm::errs() << "SelectAllBasicBlocks after4 \n";
   DenseMap<unsigned, unsigned> LiveInMap;
   if (!FuncInfo->ArgDbgValues.empty())
     for (std::pair<unsigned, unsigned> LI : RegInfo->liveins())
       if (LI.second)
         LiveInMap.insert(LI);
-
+  llvm::errs() << "SelectAllBasicBlocks after5 \n";
   // Insert DBG_VALUE instructions for function arguments to the entry block.
   bool InstrRef = MF->useDebugInstrRef();
   for (unsigned i = 0, e = FuncInfo->ArgDbgValues.size(); i != e; ++i) {
@@ -608,7 +610,7 @@ bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
       }
     }
   }
-
+  llvm::errs() << "SelectAllBasicBlocks after6 \n";
   // For debug-info, in instruction referencing mode, we need to perform some
   // post-isel maintenence.
   if (UseInstrRefDebugInfo)
@@ -631,7 +633,7 @@ bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
       }
     }
   }
-
+  llvm::errs() << "SelectAllBasicBlocks after7 \n";
   // Determine if there is a call to setjmp in the machine function.
   MF->setExposesReturnsTwice(Fn.callsFunctionThatReturnsTwice());
 
@@ -1351,7 +1353,7 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
     if (FastIS)
       FastIS->useInstrRefDebugInfo(UseInstrRefDebugInfo);
   }
-
+  llvm::errs() << "in SelectAllBasicBlocks 1 \n";
   ReversePostOrderTraversal<const Function*> RPOT(&Fn);
 
   // Lower arguments up front. An RPO iteration always visits the entry block
@@ -1364,8 +1366,9 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
   FuncInfo->InsertPt = FuncInfo->MBB->begin();
 
   CurDAG->setFunctionLoweringInfo(FuncInfo.get());
-
+  llvm::errs() << "in SelectAllBasicBlocks 2 \n";
   if (!FastIS) {
+    llvm::errs() << "in SelectAllBasicBlocks 3 \n";
     LowerArguments(Fn);
   } else {
     // See if fast isel can lower the arguments.
@@ -1397,12 +1400,13 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
     else
       FastIS->setLastLocalValue(nullptr);
   }
+  llvm::errs() << "in SelectAllBasicBlocks 4 \n";
 
   bool Inserted = SwiftError->createEntriesInEntryBlock(SDB->getCurDebugLoc());
 
   if (FastIS && Inserted)
     FastIS->setLastLocalValue(&*std::prev(FuncInfo->InsertPt));
-
+  llvm::errs() << "in SelectAllBasicBlocks 5 \n";
   processDbgDeclares(*FuncInfo);
 
   // Iterate over all basic blocks in the function.
@@ -1610,7 +1614,7 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
     FuncInfo->PHINodesToUpdate.clear();
     ElidedArgCopyInstrs.clear();
   }
-
+   llvm::errs() << "in SelectAllBasicBlocks 6 \n";
   SP.copyToMachineFrameInfo(MF->getFrameInfo());
 
   SwiftError->propagateVRegs();

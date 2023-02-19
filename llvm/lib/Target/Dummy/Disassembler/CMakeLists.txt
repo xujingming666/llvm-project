@@ -1,0 +1,5 @@
+add_llvm_component_library(LLVMDummyDisassembler
+  DummyDisassembler.cpp
+)
+
+add_dependencies(LLVMDummyDisassembler DummyCommonTableGen)

@@ -49,6 +49,8 @@
 #include "llvm/Transforms/IPO/Internalize.h"
 
 #include <memory>
+#include <iostream>
+
 using namespace clang;
 using namespace llvm;
 
@@ -378,6 +380,7 @@ namespace clang {
 
       EmbedBitcode(getModule(), CodeGenOpts, llvm::MemoryBufferRef());
 
+      std::cout << "TargetOpts.CPU" << TargetOpts.CPU << std::endl;
       EmitBackendOutput(Diags, HeaderSearchOpts, CodeGenOpts, TargetOpts,
                         LangOpts, C.getTargetInfo().getDataLayoutString(),
                         getModule(), Action, std::move(AsmOutStream));

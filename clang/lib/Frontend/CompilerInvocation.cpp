@@ -4414,6 +4414,10 @@ static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
                             DiagnosticsEngine &Diags) {
   unsigned NumErrorsBefore = Diags.getNumErrors();
 
+  llvm::errs() << "xujing x1 " << "\n";
+  Args.print(llvm::errs());
+  llvm::errs() << "xujing x1 before" << "\n";
+
   TargetOptions *TargetOpts = &Opts;
 
 #define TARGET_OPTION_WITH_MARSHALLING(                                        \
@@ -4426,6 +4430,12 @@ static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
       IMPLIED_CHECK, IMPLIED_VALUE, NORMALIZER, MERGER, TABLE_INDEX)
 #include "clang/Driver/Options.inc"
 #undef TARGET_OPTION_WITH_MARSHALLING
+
+  llvm::errs() << "xujing gogo" << TargetOpts->CPU << "\n";
+  
+  if (Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)){
+    llvm::errs() << "xujing" << A->getAsString(Args);
+  }
 
   if (Arg *A = Args.getLastArg(options::OPT_target_sdk_version_EQ)) {
     llvm::VersionTuple Version;

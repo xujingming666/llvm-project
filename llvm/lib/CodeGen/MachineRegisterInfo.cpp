@@ -508,6 +508,7 @@ LLVM_DUMP_METHOD void MachineRegisterInfo::dumpUses(Register Reg) const {
 
 void MachineRegisterInfo::freezeReservedRegs(const MachineFunction &MF) {
   ReservedRegs = getTargetRegisterInfo()->getReservedRegs(MF);
+  llvm::errs() << "ReservedRegs: " << ReservedRegs.size() << "\n";
   assert(ReservedRegs.size() == getTargetRegisterInfo()->getNumRegs() &&
          "Invalid ReservedRegs vector from target");
 }

@@ -917,6 +917,7 @@ public:
   /// registers. This method should always be preferred to calling
   /// TRI::getReservedRegs() when possible.
   const BitVector &getReservedRegs() const {
+    llvm::errs() << "getReservedRegs " << ReservedRegs.size() << "\n";
     assert(reservedRegsFrozen() &&
            "Reserved registers haven't been frozen yet. "
            "Use TRI::getReservedRegs().");
@@ -928,6 +929,7 @@ public:
   /// Reserved registers may belong to an allocatable register class, but the
   /// target has explicitly requested that they are not used.
   bool isReserved(MCRegister PhysReg) const {
+    llvm::errs() << "PhysReg.id()" << PhysReg.id() << "\n";
     return getReservedRegs().test(PhysReg.id());
   }
 

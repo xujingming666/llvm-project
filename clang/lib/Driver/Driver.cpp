@@ -52,6 +52,7 @@
 #include "ToolChains/WebAssembly.h"
 #include "ToolChains/XCore.h"
 #include "ToolChains/ZOS.h"
+#include "ToolChains/Dummy.h"
 #include "clang/Basic/TargetID.h"
 #include "clang/Basic/Version.h"
 #include "clang/Config/config.h"
@@ -1767,6 +1768,10 @@ void Driver::setUpResponseFiles(Compilation &C, Command &Cmd) {
 int Driver::ExecuteCompilation(
     Compilation &C,
     SmallVectorImpl<std::pair<int, const Command *>> &FailingCommands) {
+
+      llvm::errs()<<"xujing ExecuteCompilation \n";
+      C.getArgs().print(llvm::errs());
+      llvm::errs()<<"xujing ExecuteCompilation \n";
   if (C.getArgs().hasArg(options::OPT_fdriver_only)) {
     if (C.getArgs().hasArg(options::OPT_v))
       C.getJobs().Print(llvm::errs(), "\n", true);
@@ -5987,6 +5992,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
       // Of these targets, Hexagon is the only one that might have
       // an OS of Linux, in which case it got handled above already.
       switch (Target.getArch()) {
+      case llvm::Triple::dummy:
+        TC = std::make_unique<toolchains::DummyToolChain>(*this, Target, Args);
+        break;
       case llvm::Triple::tce:
         TC = std::make_unique<toolchains::TCEToolChain>(*this, Target, Args);
         break;

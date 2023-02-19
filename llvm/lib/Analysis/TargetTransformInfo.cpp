@@ -505,6 +505,7 @@ bool TargetTransformInfo::shouldBuildLookupTablesForConstant(
 }
 
 bool TargetTransformInfo::shouldBuildRelLookupTables() const {
+  llvm::errs() << "xujing enter \n";
   return TTIImpl->shouldBuildRelLookupTables();
 }
 

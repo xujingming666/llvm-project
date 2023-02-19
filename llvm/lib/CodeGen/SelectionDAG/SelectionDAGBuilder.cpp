@@ -163,6 +163,7 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
                                 Optional<ISD::NodeType> AssertOp = None) {
   // Let the target assemble the parts if it wants to
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+  llvm::errs()<< "getCopyFromParts \n";
   if (SDValue Val = TLI.joinRegisterPartsIntoValue(DAG, DL, Parts, NumParts,
                                                    PartVT, ValueVT, CC))
     return Val;
@@ -170,7 +171,7 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
   if (ValueVT.isVector())
     return getCopyFromPartsVector(DAG, DL, Parts, NumParts, PartVT, ValueVT, V,
                                   CC);
-
+  llvm::errs()<< "getCopyFromParts1 \n";
   assert(NumParts > 0 && "No parts to assemble!");
   SDValue Val = Parts[0];
 
@@ -179,7 +180,7 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
     if (ValueVT.isInteger()) {
       unsigned PartBits = PartVT.getSizeInBits();
       unsigned ValueBits = ValueVT.getSizeInBits();
-
+      llvm::errs()<< "getCopyFromParts2 \n";
       // Assemble the power of 2 part.
       unsigned RoundParts =
           (NumParts & (NumParts - 1)) ? 1 << Log2_32(NumParts) : NumParts;
@@ -199,10 +200,10 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
         Lo = DAG.getNode(ISD::BITCAST, DL, HalfVT, Parts[0]);
         Hi = DAG.getNode(ISD::BITCAST, DL, HalfVT, Parts[1]);
       }
-
+      llvm::errs()<< "getCopyFromParts3 \n";
       if (DAG.getDataLayout().isBigEndian())
         std::swap(Lo, Hi);
-
+      llvm::errs()<< "getCopyFromParts4 \n";
       Val = DAG.getNode(ISD::BUILD_PAIR, DL, RoundVT, Lo, Hi);
 
       if (RoundParts < NumParts) {
@@ -225,6 +226,7 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
         Lo = DAG.getNode(ISD::ZERO_EXTEND, DL, TotalVT, Lo);
         Val = DAG.getNode(ISD::OR, DL, TotalVT, Lo, Hi);
       }
+      llvm::errs()<< "getCopyFromParts5 \n";
     } else if (PartVT.isFloatingPoint()) {
       // FP split into multiple FP parts (for ppcf128)
       assert(ValueVT == EVT(MVT::ppcf128) && PartVT == MVT::f64 &&
@@ -243,6 +245,7 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
       Val = getCopyFromParts(DAG, DL, Parts, NumParts, PartVT, IntVT, V, CC);
     }
   }
+  llvm::errs()<< "getCopyFromParts6 \n";
 
   // There is now one part, held in Val.  Correct it to match ValueVT.
   // PartEVT is the type of the register class that holds the value.
@@ -251,7 +254,7 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
 
   if (PartEVT == ValueVT)
     return Val;
-
+  llvm::errs()<< "getCopyFromParts7 \n";
   if (PartEVT.isInteger() && ValueVT.isFloatingPoint() &&
       ValueVT.bitsLT(PartEVT)) {
     // For an FP value in an integer part, we need to truncate to the right
@@ -259,11 +262,12 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
     PartEVT = EVT::getIntegerVT(*DAG.getContext(),  ValueVT.getSizeInBits());
     Val = DAG.getNode(ISD::TRUNCATE, DL, PartEVT, Val);
   }
-
+  llvm::errs()<< "getCopyFromParts8 \n";
   // Handle types that have the same size.
   if (PartEVT.getSizeInBits() == ValueVT.getSizeInBits())
     return DAG.getNode(ISD::BITCAST, DL, ValueVT, Val);
 
+  llvm::errs()<< "getCopyFromParts9 \n";
   // Handle types with different sizes.
   if (PartEVT.isInteger() && ValueVT.isInteger()) {
     if (ValueVT.bitsLT(PartEVT)) {
@@ -278,6 +282,7 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
     return DAG.getNode(ISD::ANY_EXTEND, DL, ValueVT, Val);
   }
 
+  llvm::errs()<< "getCopyFromParts10 \n";
   if (PartEVT.isFloatingPoint() && ValueVT.isFloatingPoint()) {
     // FP_ROUND's are always exact here.
     if (ValueVT.bitsLT(Val.getValueType()))
@@ -287,7 +292,7 @@ static SDValue getCopyFromParts(SelectionDAG &DAG, const SDLoc &DL,
 
     return DAG.getNode(ISD::FP_EXTEND, DL, ValueVT, Val);
   }
-
+  llvm::errs()<< "getCopyFromParts11 \n";
   // Handle MMX to a narrower integer type by bitcasting MMX to integer and
   // then truncating.
   if (PartEVT == MVT::x86mmx && ValueVT.isInteger() &&
@@ -10439,7 +10444,7 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
   // In Naked functions we aren't going to save any registers.
   if (F.hasFnAttribute(Attribute::Naked))
     return;
-
+  llvm::errs() << "LowerFormalArguments 1 \n";
   if (!FuncInfo->CanLowerReturn) {
     // Put in an sret pointer parameter before all the other parameters.
     SmallVector<EVT, 1> ValueVTs;
@@ -10457,19 +10462,21 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
                          ISD::InputArg::NoArgIndex, 0);
     Ins.push_back(RetArg);
   }
-
+  llvm::errs() << "LowerFormalArguments 2 \n";
   // Look for stores of arguments to static allocas. Mark such arguments with a
   // flag to ask the target to give us the memory location of that argument if
   // available.
   ArgCopyElisionMapTy ArgCopyElisionCandidates;
   findArgumentCopyElisionCandidates(DL, FuncInfo.get(),
                                     ArgCopyElisionCandidates);
-
+  llvm::errs() << "LowerFormalArguments 3 \n";
   // Set up the incoming argument description vector.
   for (const Argument &Arg : F.args()) {
     unsigned ArgNo = Arg.getArgNo();
     SmallVector<EVT, 4> ValueVTs;
+    llvm::errs() <<  "Arg.getType()->getTypeID() " << Arg.getType()->getTypeID() << "\n";
     ComputeValueVTs(*TLI, DAG.getDataLayout(), Arg.getType(), ValueVTs);
+    llvm::errs() <<  "ValueVTs " << ValueVTs.size() << "\n";
     bool isArgValueUsed = !Arg.use_empty();
     unsigned PartBase = 0;
     Type *FinalType = Arg.getType();
@@ -10477,6 +10484,7 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
       FinalType = Arg.getParamByValType();
     bool NeedsRegBlock = TLI->functionArgumentNeedsConsecutiveRegisters(
         FinalType, F.getCallingConv(), F.isVarArg(), DL);
+    llvm::errs() << "LowerFormalArguments 4 \n";
     for (unsigned Value = 0, NumValues = ValueVTs.size();
          Value != NumValues; ++Value) {
       EVT VT = ValueVTs[Value];
@@ -10586,6 +10594,10 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
           *CurDAG->getContext(), F.getCallingConv(), VT);
       unsigned NumRegs = TLI->getNumRegistersForCallingConv(
           *CurDAG->getContext(), F.getCallingConv(), VT);
+
+      llvm::errs() <<  "VT.isInteger " << VT.isInteger() << "\n";
+      llvm::errs() <<  "RegisterVT " << RegisterVT.SimpleTy << "\n";
+      llvm::errs() <<  "NumRegs " << NumRegs << "\n";
       for (unsigned i = 0; i != NumRegs; ++i) {
         // For scalable vectors, use the minimum size; individual targets
         // are responsible for handling scalable vector arguments and
@@ -10608,11 +10620,12 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
     }
   }
 
+  llvm::errs() << "LowerFormalArguments before \n";
   // Call the target to set up the argument values.
   SmallVector<SDValue, 8> InVals;
   SDValue NewRoot = TLI->LowerFormalArguments(
       DAG.getRoot(), F.getCallingConv(), F.isVarArg(), Ins, dl, DAG, InVals);
-
+  llvm::errs() << "LowerFormalArguments after \n";
   // Verify that the target's LowerFormalArguments behaved as expected.
   assert(NewRoot.getNode() && NewRoot.getValueType() == MVT::Other &&
          "LowerFormalArguments didn't return a valid chain!");

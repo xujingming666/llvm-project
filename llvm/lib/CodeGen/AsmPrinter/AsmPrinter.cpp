@@ -444,6 +444,7 @@ bool AsmPrinter::doInitialization(Module &M) {
       .getModuleMetadata(M);
 
   OutStreamer->initSections(false, *TM.getMCSubtargetInfo());
+  llvm::errs() << " AsmPrinter::doInitialization \n"; 
 
   // Emit the version-min deployment target directive if needed.
   //
@@ -462,7 +463,7 @@ bool AsmPrinter::doInitialization(Module &M) {
 
   // Allow the target to emit any magic that it wants at the start of the file.
   emitStartOfAsmFile(M);
-
+  llvm::errs() << " AsmPrinter::doInitialization1 \n"; 
   // Very minimal debug info. It is ignored if we emit actual debug info. If we
   // don't, this at least helps the user find where a global came from.
   if (MAI->hasSingleParameterDotFile()) {
@@ -486,7 +487,7 @@ bool AsmPrinter::doInitialization(Module &M) {
       OutStreamer->emitFileDirective(FileName);
     }
   }
-
+  llvm::errs() << " AsmPrinter::doInitialization2 \n"; 
   GCModuleInfo *MI = getAnalysisIfAvailable<GCModuleInfo>();
   assert(MI && "AsmPrinter didn't require GCModuleInfo?");
   for (const auto &I : *MI)
@@ -502,7 +503,7 @@ bool AsmPrinter::doInitialization(Module &M) {
     OutStreamer->AddComment("End of file scope inline assembly");
     OutStreamer->addBlankLine();
   }
-
+  llvm::errs() << " AsmPrinter::doInitialization3 \n"; 
   if (MAI->doesSupportDebugInformation()) {
     bool EmitCodeView = M.getCodeViewFlag();
     if (EmitCodeView && TM.getTargetTriple().isOSWindows()) {
@@ -520,7 +521,7 @@ bool AsmPrinter::doInitialization(Module &M) {
       }
     }
   }
-
+  llvm::errs() << " AsmPrinter::doInitialization4 \n"; 
   if (M.getNamedMetadata(PseudoProbeDescMetadataName)) {
     PP = new PseudoProbeHandler(this);
     Handlers.emplace_back(std::unique_ptr<PseudoProbeHandler>(PP), PPTimerName,
@@ -548,7 +549,7 @@ bool AsmPrinter::doInitialization(Module &M) {
   default:
     break;
   }
-
+  llvm::errs() << " AsmPrinter::doInitialization5 \n"; 
   EHStreamer *ES = nullptr;
   switch (MAI->getExceptionHandlingType()) {
   case ExceptionHandling::None:
@@ -584,13 +585,13 @@ bool AsmPrinter::doInitialization(Module &M) {
     Handlers.emplace_back(std::unique_ptr<EHStreamer>(ES), EHTimerName,
                           EHTimerDescription, DWARFGroupName,
                           DWARFGroupDescription);
-
+  llvm::errs() << " AsmPrinter::doInitialization6 \n"; 
   // Emit tables for any value of cfguard flag (i.e. cfguard=1 or cfguard=2).
   if (mdconst::extract_or_null<ConstantInt>(M.getModuleFlag("cfguard")))
     Handlers.emplace_back(std::make_unique<WinCFGuard>(this), CFGuardName,
                           CFGuardDescription, DWARFGroupName,
                           DWARFGroupDescription);
-
+  llvm::errs() << " AsmPrinter::doInitialization7 \n"; 
   for (const HandlerInfo &HI : Handlers) {
     NamedRegionTimer T(HI.TimerName, HI.TimerDescription, HI.TimerGroupName,
                        HI.TimerGroupDescription, TimePassesIsEnabled);
@@ -1548,11 +1549,12 @@ static bool needFuncLabels(const MachineFunction &MF) {
 /// EmitFunctionBody - This method emits the body and trailer for a
 /// function.
 void AsmPrinter::emitFunctionBody() {
+  llvm::errs() << "AsmPrinter::emitFunctionBody \n";
   emitFunctionHeader();
-
+  llvm::errs() << "AsmPrinter::emitFunctionBody1 \n";
   // Emit target-specific gunk before the function body.
   emitFunctionBodyStart();
-
+  llvm::errs() << "AsmPrinter::emitFunctionBody2 \n";
   if (isVerbose()) {
     // Get MachineDominatorTree or compute it on the fly if it's unavailable
     MDT = getAnalysisIfAvailable<MachineDominatorTree>();
@@ -1561,7 +1563,7 @@ void AsmPrinter::emitFunctionBody() {
       OwnedMDT->getBase().recalculate(*MF);
       MDT = OwnedMDT.get();
     }
-
+    llvm::errs() << "AsmPrinter::emitFunctionBody3 \n";
     // Get MachineLoopInfo or compute it on the fly if it's unavailable
     MLI = getAnalysisIfAvailable<MachineLoopInfo>();
     if (!MLI) {
@@ -1570,7 +1572,7 @@ void AsmPrinter::emitFunctionBody() {
       MLI = OwnedMLI.get();
     }
   }
-
+  llvm::errs() << "AsmPrinter::emitFunctionBody4 \n";
   // Print out code for the function.
   bool HasAnyRealCode = false;
   int NumInstsInFunction = 0;
@@ -1581,6 +1583,8 @@ void AsmPrinter::emitFunctionBody() {
     emitBasicBlockStart(MBB);
     DenseMap<StringRef, unsigned> MnemonicCounts;
     for (auto &MI : MBB) {
+      MI.print(llvm::errs());
+      llvm::errs() << "AsmPrinter::emitFunctionBody5\n";
       // Print the assembly for the instruction.
       if (!MI.isPosition() && !MI.isImplicitDef() && !MI.isKill() &&
           !MI.isDebugInstr()) {
@@ -1603,7 +1607,7 @@ void AsmPrinter::emitFunctionBody() {
 
       if (isVerbose())
         emitComments(MI, OutStreamer->getCommentOS());
-
+      llvm::errs() << "AsmPrinter::emitFunctionBody6\n";
       switch (MI.getOpcode()) {
       case TargetOpcode::CFI_INSTRUCTION:
         emitCFIInstruction(MI);
@@ -1657,6 +1661,7 @@ void AsmPrinter::emitFunctionBody() {
         break;
       default:
         emitInstruction(&MI);
+        llvm::errs() << "AsmPrinter::emitFunctionBody61\n";
         if (CanDoExtraAnalysis) {
           MCInst MCI;
           MCI.setOpcode(MI.getOpcode());
@@ -1667,17 +1672,20 @@ void AsmPrinter::emitFunctionBody() {
         break;
       }
 
+      llvm::errs() << "AsmPrinter::emitFunctionBody62\n";
+
       // If there is a post-instruction symbol, emit a label for it here.
       if (MCSymbol *S = MI.getPostInstrSymbol())
         OutStreamer->emitLabel(S);
-
+      llvm::errs() << "AsmPrinter::emitFunctionBody63\n";
       for (const HandlerInfo &HI : Handlers) {
         NamedRegionTimer T(HI.TimerName, HI.TimerDescription, HI.TimerGroupName,
                            HI.TimerGroupDescription, TimePassesIsEnabled);
         HI.Handler->endInstruction();
       }
+      llvm::errs() << "AsmPrinter::emitFunctionBody64\n";
     }
-
+    llvm::errs() << "AsmPrinter::emitFunctionBody65\n";
     // We must emit temporary symbol for the end of this basic block, if either
     // we have BBLabels enabled or if this basic blocks marks the end of a
     // section.
@@ -1702,7 +1710,7 @@ void AsmPrinter::emitFunctionBody() {
       }
     }
     emitBasicBlockEnd(MBB);
-
+    llvm::errs() << "AsmPrinter::emitFunctionBody7\n";
     if (CanDoExtraAnalysis) {
       // Skip empty blocks.
       if (MBB.empty())
@@ -1733,7 +1741,7 @@ void AsmPrinter::emitFunctionBody() {
       ORE->emit(R);
     }
   }
-
+  llvm::errs() << "AsmPrinter::emitFunctionBody7\n";
   EmittedInsts += NumInstsInFunction;
   MachineOptimizationRemarkAnalysis R(DEBUG_TYPE, "InstructionCount",
                                       MF->getFunction().getSubprogram(),
@@ -1741,7 +1749,7 @@ void AsmPrinter::emitFunctionBody() {
   R << ore::NV("NumInstructions", NumInstsInFunction)
     << " instructions in function";
   ORE->emit(R);
-
+  llvm::errs() << "AsmPrinter::emitFunctionBody8\n";
   // If the function is empty and the object file uses .subsections_via_symbols,
   // then we need to emit *something* to the function body to prevent the
   // labels from collapsing together.  Just emit a noop.
@@ -1802,7 +1810,7 @@ void AsmPrinter::emitFunctionBody() {
     if (CurrentFnBeginLocal)
       OutStreamer->emitELFSize(CurrentFnBeginLocal, SizeExp);
   }
-
+  llvm::errs() << "AsmPrinter::emitFunctionBody10\n";
   for (const HandlerInfo &HI : Handlers) {
     NamedRegionTimer T(HI.TimerName, HI.TimerDescription, HI.TimerGroupName,
                        HI.TimerGroupDescription, TimePassesIsEnabled);
@@ -1814,7 +1822,7 @@ void AsmPrinter::emitFunctionBody() {
 
   // Print out jump tables referenced by the function.
   emitJumpTableInfo();
-
+  llvm::errs() << "AsmPrinter::emitFunctionBody11\n";
   // Emit post-function debug and/or EH information.
   for (const HandlerInfo &HI : Handlers) {
     NamedRegionTimer T(HI.TimerName, HI.TimerDescription, HI.TimerGroupName,

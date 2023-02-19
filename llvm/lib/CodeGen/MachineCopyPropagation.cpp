@@ -847,16 +847,16 @@ static bool isBackwardPropagatableCopy(MachineInstr &MI,
                                        bool UseCopyInstr) {
   Optional<DestSourcePair> CopyOperands = isCopyInstr(MI, TII, UseCopyInstr);
   assert(CopyOperands && "MI is expected to be a COPY");
-
+  llvm::errs() << "isBackwardPropagatableCopy inner 1 \n";
   Register Def = CopyOperands->Destination->getReg();
   Register Src = CopyOperands->Source->getReg();
 
   if (!Def || !Src)
     return false;
-
+  llvm::errs() << "isBackwardPropagatableCopy inner 2 \n";
   if (MRI.isReserved(Def) || MRI.isReserved(Src))
     return false;
-
+  llvm::errs() << "isBackwardPropagatableCopy inner 3 \n";
   return CopyOperands->Source->isRenamable() && CopyOperands->Source->isKill();
 }
 
@@ -924,19 +924,22 @@ void MachineCopyPropagation::BackwardCopyPropagateBlock(
                     << "\n");
 
   for (MachineInstr &MI : llvm::make_early_inc_range(llvm::reverse(MBB))) {
+    MI.print(llvm::errs());
     // Ignore non-trivial COPYs.
     Optional<DestSourcePair> CopyOperands = isCopyInstr(MI, *TII, UseCopyInstr);
+    llvm::errs() << "BackwardCopyPropagateBlock \n";
     if (CopyOperands && MI.getNumOperands() == 2) {
       Register DefReg = CopyOperands->Destination->getReg();
       Register SrcReg = CopyOperands->Source->getReg();
-
+      llvm::errs() << "BackwardCopyPropagateBlock inner 1 \n";
       if (!TRI->regsOverlap(DefReg, SrcReg)) {
         MCRegister Def = DefReg.asMCReg();
         MCRegister Src = SrcReg.asMCReg();
-
+        llvm::errs() << "BackwardCopyPropagateBlock inner 2 \n";
         // Unlike forward cp, we don't invoke propagateDefs here,
         // just let forward cp do COPY-to-COPY propagation.
         if (isBackwardPropagatableCopy(MI, *MRI, *TII, UseCopyInstr)) {
+          llvm::errs() << "BackwardCopyPropagateBlock inner 3 \n";
           Tracker.invalidateRegister(Src, *TRI, *TII, UseCopyInstr);
           Tracker.invalidateRegister(Def, *TRI, *TII, UseCopyInstr);
           Tracker.trackCopy(&MI, *TRI, *TII, UseCopyInstr);
@@ -944,7 +947,7 @@ void MachineCopyPropagation::BackwardCopyPropagateBlock(
         }
       }
     }
-
+    llvm::errs() << "BackwardCopyPropagateBlock1 \n";
     // Invalidate any earlyclobber regs first.
     for (const MachineOperand &MO : MI.operands())
       if (MO.isReg() && MO.isEarlyClobber()) {
@@ -953,8 +956,9 @@ void MachineCopyPropagation::BackwardCopyPropagateBlock(
           continue;
         Tracker.invalidateRegister(Reg, *TRI, *TII, UseCopyInstr);
       }
-
+    llvm::errs() << "BackwardCopyPropagateBlock2 \n";
     propagateDefs(MI);
+    llvm::errs() << "BackwardCopyPropagateBlock3 \n";
     for (const MachineOperand &MO : MI.operands()) {
       if (!MO.isReg())
         continue;
@@ -984,7 +988,7 @@ void MachineCopyPropagation::BackwardCopyPropagateBlock(
       }
     }
   }
-
+  llvm::errs() << "BackwardCopyPropagateBlock4 \n";
   for (auto *Copy : MaybeDeadCopies) {
 
     Optional<DestSourcePair> CopyOperands =
@@ -998,7 +1002,7 @@ void MachineCopyPropagation::BackwardCopyPropagateBlock(
     Copy->eraseFromParent();
     ++NumDeletes;
   }
-
+  llvm::errs() << "BackwardCopyPropagateBlock5 \n";
   MaybeDeadCopies.clear();
   CopyDbgUsers.clear();
   Tracker.clear();
