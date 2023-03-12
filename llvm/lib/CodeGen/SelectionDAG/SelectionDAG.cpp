@@ -9189,6 +9189,7 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, SDVTList VTList,
   if (VTList.NumVTs == 1)
     return getNode(Opcode, DL, VTList.VTs[0], Ops, Flags);
 
+  llvm::errs() << "SelectionDAG::getNode 1 \n";
 #ifndef NDEBUG
   for (const auto &Op : Ops)
     assert(Op.getOpcode() != ISD::DELETED_NODE &&
@@ -9280,10 +9281,11 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, SDVTList VTList,
     break;
 #endif
   }
-
+  llvm::errs() << "SelectionDAG::getNode 2 :" << VTList.NumVTs << "\n";
   // Memoize the node unless it returns a flag.
   SDNode *N;
-  if (VTList.VTs[VTList.NumVTs-1] != MVT::Glue) {
+  if (VTList.NumVTs != 0 && VTList.VTs[VTList.NumVTs-1] != MVT::Glue) {
+    llvm::errs() << "SelectionDAG::getNode 2-xx \n";
     FoldingSetNodeID ID;
     AddNodeIDNode(ID, Opcode, VTList, Ops);
     void *IP = nullptr;
@@ -9294,14 +9296,17 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, SDVTList VTList,
     createOperands(N, Ops);
     CSEMap.InsertNode(N, IP);
   } else {
+    llvm::errs() << "SelectionDAG::getNode 2-1 \n";
     N = newSDNode<SDNode>(Opcode, DL.getIROrder(), DL.getDebugLoc(), VTList);
     createOperands(N, Ops);
   }
-
+  llvm::errs() << "SelectionDAG::getNode 2-2 \n";
   N->setFlags(Flags);
   InsertNode(N);
   SDValue V(N, 0);
   NewSDValueDbgMsg(V, "Creating new node: ", this);
+
+  llvm::errs() << "SelectionDAG::getNode 3 \n";
   return V;
 }
 

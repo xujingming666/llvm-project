@@ -33,7 +33,8 @@ private:
 } // end anonymous namespace
 
 void DummyDAGToDAGISel::Select(SDNode *N) {
-  llvm::errs() << "DummyDAGToDAGISel::Select xujing" << N->getOpcode() << "\n";
+  N->print(llvm::errs());
+  llvm::errs() << "\n DummyDAGToDAGISel::Select xujing" << N->getOpcode() << "\n";
   SelectCode(N);
   return;
 }

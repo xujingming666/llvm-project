@@ -47,6 +47,7 @@ bool FinalizeISel::runOnMachineFunction(MachineFunction &MF) {
   bool Changed = false;
   const TargetLowering *TLI = MF.getSubtarget().getTargetLowering();
 
+  llvm::errs() << "START FinalizeISel" <<  "\n";
   // Iterate through each instruction in the function, looking for pseudos.
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
     MachineBasicBlock *MBB = &*I;
@@ -56,6 +57,7 @@ bool FinalizeISel::runOnMachineFunction(MachineFunction &MF) {
 
       // If MI is a pseudo, expand it.
       if (MI.usesCustomInsertionHook()) {
+        llvm::errs() << MI <<  "\n";
         Changed = true;
         MachineBasicBlock *NewMBB = TLI->EmitInstrWithCustomInserter(MI, MBB);
         // The expansion may involve new basic blocks.
@@ -68,7 +70,8 @@ bool FinalizeISel::runOnMachineFunction(MachineFunction &MF) {
       }
     }
   }
-
+  
+  llvm::errs() << "END FinalizeISel" <<  "\n";
   TLI->finalizeLowering(MF);
 
   return Changed;

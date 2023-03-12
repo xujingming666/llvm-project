@@ -520,3 +520,8 @@ defm L_ST     : SForm_RM_F_W<0b11000, 0b1, "l.st", S20_PST_L32.v>;
 
 def : Pat<(store         i32:$val,  iADDR12:$src), (L_ST_w i32:$val,          iADDR12:$src)>;
 
+def FAKE_TEST : ALUInst32<0b11101, (outs), (ins), "fake.test"> {
+}
+
+def : Pat<(int_dummy_test), (FAKE_TEST)>;
+

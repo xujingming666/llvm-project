@@ -49,6 +49,7 @@
 #include "llvm/IR/IntrinsicsVE.h"
 #include "llvm/IR/IntrinsicsWebAssembly.h"
 #include "llvm/IR/IntrinsicsX86.h"
+#include "llvm/IR/IntrinsicsDummy.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/MatrixBuilder.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -5447,6 +5448,9 @@ static Value *EmitTargetArchBuiltinExpr(CodeGenFunction *CGF,
   case llvm::Triple::riscv32:
   case llvm::Triple::riscv64:
     return CGF->EmitRISCVBuiltinExpr(BuiltinID, E, ReturnValue);
+  case llvm::Triple::dummy:
+    llvm::errs() << "--------------------------- enter dummy builtin-----";
+    return CGF->EmitDummyBuiltinExpr(BuiltinID, E);
   default:
     return nullptr;
   }
@@ -19596,4 +19600,31 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
 
   llvm::Function *F = CGM.getIntrinsic(ID, IntrinsicTypes);
   return Builder.CreateCall(F, Ops, "");
+}
+
+Value *CodeGenFunction::EmitDummyBuiltinExpr(unsigned BuiltinID,
+                                             const CallExpr *E) {
+  llvm::Type *ResultType = ConvertType(E->getType());
+  llvm::SmallVector<llvm::Type *, 2> IntrinsicTypes;
+  SmallVector<Value *, 4> Ops;
+  Intrinsic::ID ID = Intrinsic::not_intrinsic;
+
+  llvm::errs() << "Intrinsic: " << ID << "\n";
+  switch (BuiltinID) {
+  default: llvm_unreachable("unexpected builtin ID");
+  case Dummy::BI__DUMMY_TEST:
+    ID = Intrinsic::dummy_test;
+    llvm::errs() << "Intrinsic test found: " << ID << "\n";
+    break;
+  }
+  llvm::Function *F = CGM.getIntrinsic(ID);
+
+  // llvm::FunctionType *FTy = F->getFunctionType();
+  // auto * RetType = FTy->getReturnType();
+  // Value * Undef = UndefValue::get(RetType);
+  // Ops.push_back(Undef);
+
+  llvm::errs() << "Intrinsic function: " << *F << "\n";
+
+  return Builder.CreateCall(F, Ops);
 }

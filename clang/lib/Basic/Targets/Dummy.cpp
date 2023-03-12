@@ -24,12 +24,16 @@ void DummyTargetInfo::getTargetDefines(const LangOptions &Opts,
 }
 
 const Builtin::Info DummyTargetInfo::BuiltinInfo[] = {
-  Builtin::Info(),
+#define BUILTIN(ID, TYPE, ATTRS)                                               \
+  {#ID, TYPE, ATTRS, nullptr, ALL_LANGUAGES, nullptr},
+#include "clang/Basic/BuiltinsDummy.def"
+#undef BUILTIN
 };
 
 ArrayRef<Builtin::Info> DummyTargetInfo::getTargetBuiltins() const {
   // Some testcases have no -target-cpu
-  return llvm::makeArrayRef(BuiltinInfo);
+  return llvm::makeArrayRef(BuiltinInfo, clang::Dummy::LastTSBuiltin -
+                                         clang::Dummy::LastTIBuiltin + 1);
 }
 
 static constexpr llvm::StringLiteral ValidFamilyNames[] = {
