@@ -157,7 +157,23 @@ unsigned DummyMCCodeEmitter::getMachineOpValue(const MCInst &MI,
     return static_cast<unsigned>(MO.getImm());
   }
 
-  assert(false && " DummyMCCodeEmitter::getMachineOpValue unkown operand ");
+  const MCExpr *Expr = MO.getExpr();
+  MCExpr::ExprKind Kind = Expr->getKind();
+  if (Kind == MCExpr::Binary) {
+    Expr = static_cast<const MCBinaryExpr*>(Expr)->getLHS();
+    Kind = Expr->getKind();
+  }
+
+  if (Kind == MCExpr::Target) {
+    assert(false && " DummyMCCodeEmitter::getMachineOpValue MCExpr::Target not supported \n ");
+  }else if (Kind == MCExpr::Constant)
+    return cast<MCConstantExpr>(Expr)->getValue();
+  else {
+    assert (Kind == MCExpr::SymbolRef);
+  }
+
+  return 0;
+  
 }
 
 unsigned DummyMCCodeEmitter::getMemRI12Encoding(const MCInst &MI, unsigned OpNo,

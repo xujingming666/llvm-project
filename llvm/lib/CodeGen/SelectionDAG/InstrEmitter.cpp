@@ -964,6 +964,8 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
   unsigned NumDefs = II.getNumDefs();
   const MCPhysReg *ScratchRegs = nullptr;
 
+  llvm::errs() << "II: " << Node << "\n";
+
   // Handle STACKMAP and PATCHPOINT specially and then use the generic code.
   if (Opc == TargetOpcode::STACKMAP || Opc == TargetOpcode::PATCHPOINT) {
     // Stackmaps do not have arguments and do not preserve their calling

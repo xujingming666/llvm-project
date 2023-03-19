@@ -53,6 +53,11 @@ public:
                       const SmallVectorImpl<ISD::OutputArg> &Outs,
                       const SmallVectorImpl<SDValue> &OutVals, const SDLoc &dl,
                       SelectionDAG &DAG) const;
+  MachineBasicBlock *ExpandSelectCC(MachineInstr &MI,
+                                                     MachineBasicBlock *BB,
+                                                     unsigned BranchOp) const;
+  MachineBasicBlock *EmitInstrWithCustomInserter(MachineInstr &MI,
+                                               MachineBasicBlock *BB) const;
 };
 
 } // end namespace llvm

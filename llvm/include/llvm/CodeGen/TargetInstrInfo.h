@@ -608,7 +608,7 @@ public:
                                     MachineBasicBlock &RestoreBB,
                                     const DebugLoc &DL, int64_t BrOffset = 0,
                                     RegScavenger *RS = nullptr) const {
-    llvm_unreachable("target did not implement");
+    llvm_unreachable("target did not implement insertIndirectBranch");
   }
 
   /// Analyze the branching code at the end of MBB, returning

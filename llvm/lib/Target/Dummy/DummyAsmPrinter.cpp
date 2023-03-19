@@ -44,6 +44,14 @@ public:
         ResultMCInstr->addOperand(MCOperand::createImm(MO.getImm()));
         continue;
       }
+
+      llvm::errs() << "MOTy:" << MOTy << "\n";
+
+      if (MOTy == MachineOperand::MO_MachineBasicBlock) {
+        const MCSymbolRefExpr *expr = MCSymbolRefExpr::create(MO.getMBB()->getSymbol(), MO.getMBB()->getParent()->getContext());
+        ResultMCInstr->addOperand(MCOperand::createExpr(expr));
+        continue;
+      }
       // if (MO.isReg() && MO.isImplicit()) {
       //   continue;
       // }

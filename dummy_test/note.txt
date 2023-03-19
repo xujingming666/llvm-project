@@ -1,3 +1,4 @@
+
 llvm-bin-Debug/bin/clang test.c -mllvm -print-after-all -S --target=dummy -mcpu=dummy -mcmodel=small -o a.s
 ../llvm-bin-Debug/bin/llvm-mc a.s --arch=dummy --triple=dummy --mcpu=dummy --mattr=+dummy -filetype=obj -o test.o
 ../llvm-bin-Debug/bin/llvm-mc test.o --disassemble --arch=dummy --triple=dummy --mcpu=dummy --mattr=+dummy -filetype=asm -o out.asm

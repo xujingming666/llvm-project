@@ -525,3 +525,161 @@ def FAKE_TEST : ALUInst32<0b11101, (outs), (ins), "fake.test"> {
 
 def : Pat<(int_dummy_test), (FAKE_TEST)>;
 
+multiclass SELECT_CC_PSEUDO<RegisterClass rc, RegisterClass ccRc> {
+  let usesCustomInserter = 1 in {
+    def _EQ : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _NE : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _GE : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _LT : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _UGE : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _ULT : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _OGE : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _OLT : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _OEQ : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _ONE : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _UEQ : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+    def _UNE : PseudoInst32<(outs rc:$dst),
+                           (ins ccRc:$src1, ccRc:$src2, rc:$t, rc:$f), "", []>;
+  }
+}
+
+def select_cc
+    : SDNode<"ISD::SELECT_CC", SDTSelectCC>;
+
+multiclass SELECT_CC_PAT<RegisterClass rc, ValueType vt, string prefix,
+                         ValueType ccTy, RegisterClass ccRc> {
+  // Native cond codes map to bcc instruction
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETEQ),
+            (!cast<Instruction>(prefix#_EQ) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETNE),
+            (!cast<Instruction>(prefix#_NE) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETGE),
+            (!cast<Instruction>(prefix#_GE) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETLT),
+            (!cast<Instruction>(prefix#_LT) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETUGE),
+            (!cast<Instruction>(prefix#_UGE) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETULT),
+            (!cast<Instruction>(prefix#_ULT) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETOGE),
+            (!cast<Instruction>(prefix#_OGE) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETOLT),
+            (!cast<Instruction>(prefix#_OLT) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETOEQ),
+            (!cast<Instruction>(prefix#_OEQ) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETONE),
+            (!cast<Instruction>(prefix#_ONE) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETUEQ),
+            (!cast<Instruction>(prefix#_UEQ) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETUNE),
+            (!cast<Instruction>(prefix#_UNE) ccRc:$src1, ccRc:$src2, rc:$t, rc:$f)>;
+
+  // Other cond code patterns require swapping comparision operands
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETGT),
+            (!cast<Instruction>(prefix#_LT) ccRc:$src2, ccRc:$src1, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETLE),
+            (!cast<Instruction>(prefix#_GE) ccRc:$src2, ccRc:$src1, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETUGT),
+            (!cast<Instruction>(prefix#_ULT) ccRc:$src2, ccRc:$src1, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETULE),
+            (!cast<Instruction>(prefix#_UGE) ccRc:$src2, ccRc:$src1, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETOGT),
+            (!cast<Instruction>(prefix#_OLT) ccRc:$src2, ccRc:$src1, rc:$t, rc:$f)>;
+  def : Pat<(select_cc ccTy:$src1, ccTy:$src2, vt:$t, vt:$f, SETOLE),
+            (!cast<Instruction>(prefix#_OGE) ccRc:$src2, ccRc:$src1, rc:$t, rc:$f)>;
+}
+
+defm SEL20     : SELECT_CC_PSEUDO<GRegs, GRegs>;
+defm : SELECT_CC_PAT<GRegs, i32, "SEL20", i32, GRegs>;
+
+
+class MVInst32<bits<5> opcode, dag outs, dag ins, string asmstr,
+               list<dag> pattern = []>
+    : DummyInst32<outs, ins, asmstr, pattern> {
+  let Inst{5-1}      = opcode;
+  let TSFlags{3-0}   = S20_PST_L32.v;
+  let mayLoad        = 1;
+  let mayStore       = 0;
+  let hasSideEffects = 0;
+}
+
+class MForm_RI<bits<5> op, bits<1> sub, bits<2> width, bits<1> flush,
+               string asm_op, bits<4> slot>
+    : MVInst32<op, (outs GRegs:$Rd), (ins i32imm:$addr),
+               asm_op  # " $Rd, $addr", []>
+{
+  bits<5> Rd;
+  bits<17> addr;
+
+  let Inst{10-6}  = Rd;
+  let Inst{15-11} = addr{4-0};    // Rs
+
+  let Inst{22-21} = width;
+  let Inst{23}    = sub;
+  let Inst{24}    = flush;
+
+  let Inst{20-16} = addr{9-5};    // Imm5
+  let Inst{31-25} = addr{16-10};  // Imm7
+
+  let TSFlags{3-0} = slot;
+}
+
+def MOVE_I32 : MForm_RI<0b11100, 0b1, 2, 0, "mov", S20_PST_L32.v> { }
+
+
+//--------------------------------------
+// BForm - Conditional Jumps
+//--------------------------------------
+class BForm_RRI_BASE<bits<5> op, bits<2> cmp, string asm_op, bits<4> slot>
+  : BranchInst<op, (outs), (ins GRegs:$Rs1, GRegs:$Rs2, b_target:$dst),
+                 asm_op # " $Rs1, $Rs2, $dst">  {
+  bits<5>  Rs1;
+  bits<5>  Rs2;
+
+  let Inst{15-11}  = Rs1;
+  let Inst{20-16}  = Rs2;
+  let Inst{31-30}  = cmp;
+  let TSFlags{3-0} = slot;
+}
+
+class BForm_RRI<bits<5> op, bits<2> sign, bits<2> cmp, string asm_op,
+                bits<4> slot>
+    : BForm_RRI_BASE<op, cmp, asm_op, slot> {
+  bits<12> dst;
+
+  let Inst{10-6}   = dst{4-0};
+  let Inst{22-21}  = dst{6-5};
+  let Inst{29-25}  = dst{11-7};
+  let Inst{24-23}  = sign;
+}
+
+multiclass BForm_RRI_S<bits<5> op, bits<2> cmp, string asm_op, bits<4> slot> {
+  def U : BForm_RRI<op, 0, cmp, asm_op # ".u", slot>;
+  def S : BForm_RRI<op, 1, cmp, asm_op # ".s", slot>;
+}
+
+
+let isBranch = 1, isTerminator = 1, Control = 1, Itinerary = IIC_Scalar_RP23 in {
+    def L_BEQ  : BForm_RRI<0b10101, 0, 0, "l.beq", S20_PST_L32.v>;
+    def L_BNE  : BForm_RRI<0b10101, 0, 1, "l.bne", S20_PST_L32.v>;
+    defm L_BGE : BForm_RRI_S<0b10101, 2, "l.bge", S20_PST_L32.v>;
+    defm L_BLT : BForm_RRI_S<0b10101, 3, "l.blt", S20_PST_L32.v>;
+  }
+
+
+let isTerminator = 1, isBranch = 1, isBarrier = 1 in
+def L_PseudoJMP :
+  PseudoInst32<(outs), (ins b_target:$addr), "", [(br bb:$addr)]>,
+  PseudoInstExpansion<(L_JAL R0, b_target:$addr)> { let Itinerary = IIC_Scalar_WP1;
+  let TSFlags{3-0} = S20_PST_L32.v; }

@@ -14,7 +14,8 @@
 #define LLVM_DUMMY_DUMMYINSTRINFO_H
 
 #include "llvm/CodeGen/TargetInstrInfo.h"
-#include "llvm/CodeGen/TargetInstrInfo.h"
+#include "llvm/CodeGen/MachineFrameInfo.h"
+
 
 #define GET_INSTRINFO_HEADER
 #include "DummyGenInstrInfo.inc"
@@ -26,6 +27,25 @@ struct DummyInstrInfo : public DummyGenInstrInfo {
   bool expandPostRAPseudo(MachineInstr &MI) const override;
   unsigned getInstSizeInBytes(const MachineInstr &MI) const override;
   ~DummyInstrInfo() override;
+
+  void storeRegToStackSlot(MachineBasicBlock &MBB,
+                           MachineBasicBlock::iterator MI, Register SrcReg,
+                           bool IsKill, int FrameIndex,
+                           const TargetRegisterClass *RC,
+                           const TargetRegisterInfo *TRI) const override;
+  void loadRegFromStackSlot(MachineBasicBlock &MBB,
+                            MachineBasicBlock::iterator MI,
+                            Register DestReg, int FrameIndex,
+                            const TargetRegisterClass *RC,
+                            const TargetRegisterInfo *TRI) const override;
+  void insertIndirectBranch(MachineBasicBlock &MBB,
+                            MachineBasicBlock &NewDestBB,
+                            MachineBasicBlock &RestoreBB,
+                            const DebugLoc &DL, int64_t BrOffset = 0,
+                            RegScavenger *RS = nullptr) const override;
+  virtual MachineBasicBlock * getBranchDestBlock(const MachineInstr &MI) const override;
+  virtual bool isBranchOffsetInRange(unsigned BranchOpc,
+                                    int64_t BrOffset) const override;
 };
 } // namespace llvm
 

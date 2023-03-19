@@ -133,3 +133,95 @@ DummyTargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
 
   return DAG.getNode(DUMMYISD::RET_FLAG, dl, MVT::Other, RetOps);
 }
+
+MachineBasicBlock *DummyTargetLowering::ExpandSelectCC(MachineInstr &MI,
+                                                     MachineBasicBlock *BB,
+                                                     unsigned BranchOp) const {
+  const DummyInstrInfo *TII = (DummyInstrInfo *)(Subtarget.getInstrInfo());
+  DebugLoc dl = MI.getDebugLoc();
+
+  // To "insert" a SELECT_CC instruction, we actually have to insert the
+  // triangle control-flow pattern. The incoming instruction knows the
+  // destination vreg to set, the condition code register to branch on, the
+  // true/false values to select between, and the condition code for the branch.
+  //
+  // We produce the following control flow:
+  //     ThisMBB
+  //     |  \
+  //     |  IfFalseMBB
+  //     | /
+  //    SinkMBB
+  const BasicBlock *LLVM_BB = BB->getBasicBlock();
+  MachineFunction::iterator It = ++BB->getIterator();
+
+  MachineBasicBlock *ThisMBB = BB;
+  MachineFunction *F = BB->getParent();
+  MachineBasicBlock *IfFalseMBB = F->CreateMachineBasicBlock(LLVM_BB);
+  MachineBasicBlock *SinkMBB = F->CreateMachineBasicBlock(LLVM_BB);
+  F->insert(It, IfFalseMBB);
+  F->insert(It, SinkMBB);
+
+  // Transfer the remainder of ThisMBB and its successor edges to SinkMBB.
+  SinkMBB->splice(SinkMBB->begin(), ThisMBB,
+                  std::next(MachineBasicBlock::iterator(MI)), ThisMBB->end());
+  SinkMBB->transferSuccessorsAndUpdatePHIs(ThisMBB);
+
+  // Set the new successors for ThisMBB.
+  ThisMBB->addSuccessor(IfFalseMBB);
+  ThisMBB->addSuccessor(SinkMBB);
+
+  unsigned LHS = MI.getOperand(1).getReg();
+  unsigned RHS = MI.getOperand(2).getReg();
+
+  MachineRegisterInfo &RegInfo = MI.getMF()->getRegInfo();
+
+  {
+    BuildMI(ThisMBB, dl, TII->get(BranchOp))
+                          .addReg(LHS)
+                          .addReg(RHS)
+                          .addMBB(SinkMBB);
+  }
+
+  // IfFalseMBB just falls through to SinkMBB.
+  IfFalseMBB->addSuccessor(SinkMBB);
+
+  // %Result = phi [ %TrueValue, ThisMBB ], [ %FalseValue, IfFalseMBB ]
+  BuildMI(*SinkMBB, SinkMBB->begin(), dl, TII->get(Dummy::PHI),
+          MI.getOperand(0).getReg())
+      .addReg(MI.getOperand(3).getReg())
+      .addMBB(ThisMBB)
+      .addReg(MI.getOperand(4).getReg())
+      .addMBB(IfFalseMBB);
+  MI.eraseFromParent(); // The pseudo instruction is gone now.
+  return SinkMBB;
+}
+
+MachineBasicBlock *
+DummyTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
+                                               MachineBasicBlock *BB) const {
+  unsigned BranchOp = 0;
+  switch (MI.getOpcode()) {
+  default:
+    llvm_unreachable("Unknown SELECT_CC pseudo!");
+  case Dummy::SEL20_EQ:
+    BranchOp = Dummy::L_BEQ;
+    break;
+  case Dummy::SEL20_NE:
+    BranchOp = Dummy::L_BNE;
+    break;
+  case Dummy::SEL20_LT:
+    BranchOp = Dummy::L_BLTS;
+    break;
+  case Dummy::SEL20_ULT:
+    BranchOp = Dummy::L_BLTU;
+    break;
+  case Dummy::SEL20_GE:
+    BranchOp =  Dummy::L_BGES ;
+    break;
+  case Dummy::SEL20_UGE:
+    BranchOp =  Dummy::L_BGEU;
+    break;
+  }
+
+  return ExpandSelectCC(MI, BB, BranchOp);
+}
