@@ -52,6 +52,12 @@ public:
         ResultMCInstr->addOperand(MCOperand::createExpr(expr));
         continue;
       }
+
+      if (MOTy == MachineOperand::MO_GlobalAddress) {        
+        const MCSymbolRefExpr *expr = MCSymbolRefExpr::create(StringRef(MO.getGlobal()->getGlobalIdentifier()), MCSymbolRefExpr::VK_None, MI->getParent()->getParent()->getContext());
+        ResultMCInstr->addOperand(MCOperand::createExpr(expr));
+        continue;
+      }
       // if (MO.isReg() && MO.isImplicit()) {
       //   continue;
       // }

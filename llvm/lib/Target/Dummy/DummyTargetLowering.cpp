@@ -41,6 +41,7 @@ DummyTargetLowering::DummyTargetLowering(const DummyTargetMachine &TM,
     }
     setOperationAction(ISD::SETCC, T, Expand);
   }
+  setOperationAction(ISD::GlobalAddress, MVT::i32, Custom);
 }
 
 #include "DummyGenCallingConv.inc"
@@ -224,4 +225,37 @@ DummyTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   }
 
   return ExpandSelectCC(MI, BB, BranchOp);
+}
+
+SDValue DummyTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
+  switch (Op.getOpcode()) {
+  default:
+    llvm_unreachable("Unimplemented operand");
+  case ISD::GlobalAddress:
+    return LowerGlobalAddress(Op, DAG);
+  }
+}
+
+SDValue DummyTargetLowering::LowerGlobalAddress(SDValue Op,
+                                              SelectionDAG &DAG) const {
+  // Lower global variable address to LDI_HI/LDI16_u pair.
+
+  // Global address in function call is already lowered by LowerCall,
+  // so here we only consider global variable addresses.
+  // This also includes lowering constant pool addresses generated
+  // by compiler.
+
+  SDLoc DL(Op);
+  EVT VT = Op.getValueType();
+  GlobalAddressSDNode *N = cast<GlobalAddressSDNode>(Op);
+  const GlobalValue *GV = N->getGlobal();
+  int64_t Offset = N->getOffset();
+
+  SDValue GA = DAG.getTargetGlobalAddress(GV, DL, VT, Offset);
+
+  SDValue MN =
+      SDValue(DAG.getMachineNode(Dummy::MOVE_I32,
+                                 DL, MVT::i32, GA),
+              0);
+  return MN;
 }

@@ -964,7 +964,7 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
   unsigned NumDefs = II.getNumDefs();
   const MCPhysReg *ScratchRegs = nullptr;
 
-  llvm::errs() << "II: " << Node << "\n";
+  llvm::errs() << "II: " << Opc << "\n";
 
   // Handle STACKMAP and PATCHPOINT specially and then use the generic code.
   if (Opc == TargetOpcode::STACKMAP || Opc == TargetOpcode::PATCHPOINT) {
@@ -988,6 +988,12 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
                              II.isVariadic() && II.variadicOpsAreDefs();
   bool HasPhysRegOuts = NumResults > NumDefs &&
                         II.getImplicitDefs() != nullptr && !HasVRegVariadicDefs;
+  Node->print(llvm::errs());
+  llvm::errs() << "NodeOperands="<<NodeOperands<<" NumResults:"<<NumResults 
+               << "II.getNumOperands():" << II.getNumOperands()
+               << "II.getNumImplicitDefs()" << II.getNumImplicitDefs()
+               << "NumImpUses:" << NumImpUses
+               <<"\n";
 #ifndef NDEBUG
   unsigned NumMIOperands = NodeOperands + NumResults;
   if (II.isVariadic())

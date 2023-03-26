@@ -58,6 +58,8 @@ public:
                                                      unsigned BranchOp) const;
   MachineBasicBlock *EmitInstrWithCustomInserter(MachineInstr &MI,
                                                MachineBasicBlock *BB) const;
+  SDValue LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
+  virtual SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
 };
 
 } // end namespace llvm

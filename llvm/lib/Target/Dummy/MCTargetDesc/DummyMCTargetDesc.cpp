@@ -70,6 +70,14 @@ public:
 
   void printOperand(const MCInst *MI, unsigned OpNo, raw_ostream &O);
   void printMemRegImm12(const MCInst *MI, unsigned OpNo, raw_ostream &O) {
+    const MCOperand & MO = MI->getOperand(OpNo);
+    if (MO.isExpr()) {
+      MO.getExpr()->print(O, &MAI);
+      unsigned Disp = MI->getOperand(OpNo + 1).getImm();
+      O << ", " << formatImm(Disp);
+      return;
+    }
+
     unsigned RegNo = MI->getOperand(OpNo).getReg();
     unsigned Disp = MI->getOperand(OpNo + 1).getImm();
     O << StringRef(getRegisterName(RegNo)).lower() << ", " << formatImm(Disp);
