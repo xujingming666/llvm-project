@@ -4327,11 +4327,11 @@ def LoopHint : Attr {
 
   /// State of the loop optimization specified by the spelling.
   let Args = [EnumArgument<"Option", "OptionType", /*is_string=*/false,
-                          ["vectorize", "vectorize_width", "interleave", "interleave_count",
+                          ["vectorize", "FuseTag", "vectorize_width", "interleave", "interleave_count",
                            "unroll", "unroll_count", "unroll_and_jam", "unroll_and_jam_count",
                            "pipeline", "pipeline_initiation_interval", "distribute",
                            "vectorize_predicate"],
-                          ["Vectorize", "VectorizeWidth", "Interleave", "InterleaveCount",
+                          ["Vectorize", "FuseTag", "VectorizeWidth", "Interleave", "InterleaveCount",
                            "Unroll", "UnrollCount", "UnrollAndJam", "UnrollAndJamCount",
                            "PipelineDisabled", "PipelineInitiationInterval", "Distribute",
                            "VectorizePredicate"]>,
@@ -4346,6 +4346,7 @@ def LoopHint : Attr {
   static const char *getOptionName(int Option) {
     switch(Option) {
     case Vectorize: return "vectorize";
+    case FuseTag: return "fuse_tag";
     case VectorizeWidth: return "vectorize_width";
     case Interleave: return "interleave";
     case InterleaveCount: return "interleave_count";

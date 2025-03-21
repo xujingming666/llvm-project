@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -25,6 +26,7 @@
 
 using namespace mlir;
 using namespace mlir::linalg;
+using namespace mlir::math;
 
 //===----------------------------------------------------------------------===//
 // Utility methods for implementation of Tiling Interface for Linalg ops
@@ -1234,6 +1236,7 @@ void mlir::linalg::registerTilingInterfaceExternalModels(
     registerAll<
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
         >(ctx);
+    registerOne<math::CosOp>(ctx);
   });
 }
 

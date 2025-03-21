@@ -11,6 +11,11 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include <optional>
 
 using namespace mlir;
@@ -230,6 +235,15 @@ OpFoldResult math::CosOp::fold(FoldAdaptor adaptor) {
       });
 }
 
+#if 0
+SmallVector<utils::IteratorType> math::CosOp::getIteratorTypesArray() {
+  int64_t inputRank =
+      llvm::cast<ShapedType>(getInputs()[0].getType()).getRank();
+  SmallVector<utils::IteratorType> iteratorTypes(inputRank,
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+#endif
 //===----------------------------------------------------------------------===//
 // CoshOp folder
 //===----------------------------------------------------------------------===//

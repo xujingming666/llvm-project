@@ -21,7 +21,17 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 class Math_Op<string mnemonic, list<Trait> traits = []> :
     Op<Math_Dialect, mnemonic, traits # [Pure,
     DeclareOpInterfaceMethods<VectorUnrollOpInterface>] #
-    ElementwiseMappable.traits>;
+    ElementwiseMappable.traits> {
+  let extraClassDeclaration = [{
+    SmallVector<utils::IteratorType> getIteratorTypesArray() {
+      int64_t inputRank =
+      llvm::cast<ShapedType>(getOperation()->getOpOperands()[0].get().getType()).getRank();
+      SmallVector<utils::IteratorType> iteratorTypes(inputRank,
+                                                 utils::IteratorType::parallel);
+      return iteratorTypes;
+    }
+  }]; 
+}
 
 // Base class for unary math operations on integer types. Require an operand
 // and result of the same type. This type can be an integer type, vector or

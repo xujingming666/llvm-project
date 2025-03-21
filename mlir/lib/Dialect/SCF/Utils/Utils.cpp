@@ -146,6 +146,7 @@ FailureOr<func::FuncOp> mlir::outlineSingleBlockRegion(RewriterBase &rewriter,
     outlinedFuncArgLocs.push_back(arg.getLoc());
   }
   for (Value value : outlinedValues) {
+    if (value.getDefiningOp<arith::ConstantIndexOp>() != nullptr) continue;
     outlinedFuncArgTypes.push_back(value.getType());
     outlinedFuncArgLocs.push_back(value.getLoc());
   }
@@ -184,7 +185,11 @@ FailureOr<func::FuncOp> mlir::outlineSingleBlockRegion(RewriterBase &rewriter,
     rewriter.setInsertionPointToEnd(newBlock);
     SmallVector<Value> callValues;
     llvm::append_range(callValues, newBlock->getArguments());
-    llvm::append_range(callValues, outlinedValues);
+    //llvm::append_range(callValues, outlinedValues);
+    llvm::append_range(callValues, llvm::filter_to_vector(outlinedValues, 
+			    [&](mlir::Value v) { 
+			    	return v.getDefiningOp<arith::ConstantIndexOp>() == nullptr; 
+			    }));
     auto call = rewriter.create<func::CallOp>(loc, outlinedFunc, callValues);
     if (callOp)
       *callOp = call;
@@ -200,16 +205,19 @@ FailureOr<func::FuncOp> mlir::outlineSingleBlockRegion(RewriterBase &rewriter,
 
   // Lastly, explicit RAUW outlinedValues, only for uses within `outlinedFunc`.
   // Clone the `arith::ConstantIndexOp` at the start of `outlinedFuncBody`.
-  for (auto it : llvm::zip(outlinedValues, outlinedFuncBlockArgs.take_back(
-                                               outlinedValues.size()))) {
-    Value orig = std::get<0>(it);
-    Value repl = std::get<1>(it);
+  int idx = 0;
+  for (auto it : outlinedValues) {
+    Value orig = it;
+    Value repl = nullptr;
     {
       OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(outlinedFuncBody);
       if (Operation *cst = orig.getDefiningOp<arith::ConstantIndexOp>()) {
         IRMapping bvm;
         repl = rewriter.clone(*cst, bvm)->getResult(0);
+      } else {
+	repl = outlinedFuncBlockArgs[idx + region.getArguments().size()];
+     	idx++;
       }
     }
     orig.replaceUsesWithIf(repl, [&](OpOperand &opOperand) {

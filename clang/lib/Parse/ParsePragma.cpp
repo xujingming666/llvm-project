@@ -3646,6 +3646,7 @@ void PragmaLoopHintHandler::HandlePragma(Preprocessor &PP,
 
     bool OptionValid = llvm::StringSwitch<bool>(OptionInfo->getName())
                            .Case("vectorize", true)
+                           .Case("fuse_tag", true)
                            .Case("interleave", true)
                            .Case("unroll", true)
                            .Case("distribute", true)

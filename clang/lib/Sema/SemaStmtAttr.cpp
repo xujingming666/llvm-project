@@ -132,6 +132,7 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
     Option = llvm::StringSwitch<LoopHintAttr::OptionType>(
                  OptionLoc->Ident->getName())
                  .Case("vectorize", LoopHintAttr::Vectorize)
+                 .Case("fuse_tag", LoopHintAttr::FuseTag)
                  .Case("vectorize_width", LoopHintAttr::VectorizeWidth)
                  .Case("interleave", LoopHintAttr::Interleave)
                  .Case("vectorize_predicate", LoopHintAttr::VectorizePredicate)
@@ -155,6 +156,7 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
         State = LoopHintAttr::FixedWidth;
     } else if (Option == LoopHintAttr::InterleaveCount ||
                Option == LoopHintAttr::UnrollCount ||
+               Option == LoopHintAttr::FuseTag ||
                Option == LoopHintAttr::PipelineInitiationInterval) {
       assert(ValueExpr && "Attribute must have a valid value expression.");
       if (S.CheckLoopHintExpr(ValueExpr, St->getBeginLoc(),
