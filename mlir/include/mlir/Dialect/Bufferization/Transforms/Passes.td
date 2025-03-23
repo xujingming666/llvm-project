@@ -416,7 +416,7 @@ def OneShotBufferizePass : Pass<"one-shot-bufferize", "ModuleOp"> {
               /*default=*/"\"bottom-up\"",
               "Heuristic that control the IR traversal during analysis">,
        Option<"bufferizeFunctionBoundaries", "bufferize-function-boundaries",
-              "bool", /*default=*/"0",
+              "bool", /*default=*/"1",
               "Bufferize function boundaries (experimental).">,
        Option<"checkParallelRegions", "check-parallel-regions", "bool",
               /*default=*/"true",
