@@ -162,7 +162,7 @@ def ArithToLLVMConversionPass : Pass<"convert-arith-to-llvm"> {
   let dependentDialects = ["LLVM::LLVMDialect"];
   let options = [
     Option<"indexBitwidth", "index-bitwidth", "unsigned",
-           /*default=kDeriveIndexBitwidthFromDataLayout*/"0",
+           /*default=kDeriveIndexBitwidthFromDataLayout*/"32",
            "Bitwidth of the index type, 0 to use size of machine word">,
   ];
 }
@@ -340,7 +340,7 @@ def ConvertControlFlowToLLVMPass : Pass<"convert-cf-to-llvm", "ModuleOp"> {
   let dependentDialects = ["LLVM::LLVMDialect"];
   let options = [
     Option<"indexBitwidth", "index-bitwidth", "unsigned",
-           /*default=kDeriveIndexBitwidthFromDataLayout*/"0",
+           /*default=kDeriveIndexBitwidthFromDataLayout*/"32",
            "Bitwidth of the index type, 0 to use size of machine word">
   ];
 }
@@ -455,7 +455,7 @@ def ConvertFuncToLLVMPass : Pass<"convert-func-to-llvm", "ModuleOp"> {
            "Replace FuncOp's MemRef arguments with bare pointers to the MemRef "
            "element types">,
     Option<"indexBitwidth", "index-bitwidth", "unsigned",
-           /*default=kDeriveIndexBitwidthFromDataLayout*/"0",
+           /*default=kDeriveIndexBitwidthFromDataLayout*/"32",
            "Bitwidth of the index type, 0 to use size of machine word">,
   ];
 }
@@ -661,7 +661,7 @@ def ConvertIndexToLLVMPass : Pass<"convert-index-to-llvm"> {
 
   let options = [
     Option<"indexBitwidth", "index-bitwidth", "unsigned",
-           /*default=kDeriveIndexBitwidthFromDataLayout*/"0",
+           /*default=kDeriveIndexBitwidthFromDataLayout*/"32",
            "Bitwidth of the index type, 0 to use size of machine word">,
   ];
 }
@@ -835,7 +835,7 @@ def FinalizeMemRefToLLVMConversionPass :
     Option<"useAlignedAlloc", "use-aligned-alloc", "bool", /*default=*/"false",
            "Use aligned_alloc in place of malloc for heap allocations">,
     Option<"indexBitwidth", "index-bitwidth", "unsigned",
-           /*default=kDeriveIndexBitwidthFromDataLayout*/"0",
+           /*default=kDeriveIndexBitwidthFromDataLayout*/"32",
            "Bitwidth of the index type, 0 to use size of machine word">,
     Option<"useGenericFunctions", "use-generic-functions",
            "bool",

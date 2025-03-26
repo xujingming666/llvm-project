@@ -62,6 +62,11 @@ FailureOr<LLVM::LLVMFuncOp> lookupOrCreateGenericFreeFn(Operation *moduleOp);
 FailureOr<LLVM::LLVMFuncOp>
 lookupOrCreateMemRefCopyFn(Operation *moduleOp, Type indexType,
                            Type unrankedDescriptorType);
+FailureOr<LLVM::LLVMFuncOp>
+lookupOrCreateMemRefCopyFn1(Operation *moduleOp, Type targetType,
+                           Type srcType, int dim = 1);
+FailureOr<LLVM::LLVMFuncOp>
+lookupOrCreateMemAllocFn1(Operation *moduleOp, Type resultType, int dim = 1);
 
 /// Create a FuncOp with signature `resultType`(`paramTypes`)` and name `name`.
 /// Return a failure if the FuncOp found has unexpected signature.

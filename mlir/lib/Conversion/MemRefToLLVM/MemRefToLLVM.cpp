@@ -63,6 +63,27 @@ struct AllocOpLowering : public AllocLikeOpLLVMLowering {
         rewriter, loc, sizeBytes, op,
         getAlignment(rewriter, loc, cast<memref::AllocOp>(op)));
   }
+
+  LogicalResult matchAndRewrite(
+    Operation *op, ArrayRef<Value> operands,
+    ConversionPatternRewriter &rewriter) const {
+    MemRefType memRefType = getMemRefResultType(op);
+    if (!isConvertibleAndHasIdentityMaps(memRefType))
+      return rewriter.notifyMatchFailure(op, "incompatible memref type");
+    auto loc = op->getLoc();
+
+    auto typeConverted = getTypeConverter()->getMemRefDescriptorFields(memRefType, false);
+    auto memrefStructType = mlir::LLVM::LLVMStructType::getLiteral(&(getTypeConverter()->getContext()), typeConverted);
+
+    auto allocFuncOp = mlir::LLVM::lookupOrCreateMemAllocFn1(
+         op->getParentOfType<ModuleOp>(), memrefStructType, memRefType.getShape().size());
+    if (failed(allocFuncOp))
+      return failure();
+    auto results = rewriter.create<LLVM::CallOp>(loc, allocFuncOp.value(), ValueRange{});
+
+    rewriter.replaceOp(op, results);
+    return success();
+  }
 };
 
 struct AlignedAllocOpLowering : public AllocLikeOpLLVMLowering {
@@ -780,6 +801,34 @@ struct MemRefCopyOpLowering : public ConvertOpToLLVMPattern<memref::CopyOp> {
   }
 
   LogicalResult
+  lowerToMemCopyFunctionCall1(memref::CopyOp op, OpAdaptor adaptor,
+                             ConversionPatternRewriter &rewriter) const {
+    auto loc = op.getLoc();
+    auto srcType = cast<BaseMemRefType>(op.getSource().getType());
+    auto targetType = cast<BaseMemRefType>(op.getTarget().getType());
+
+    auto srcMemRefType = dyn_cast<MemRefType>(srcType);
+    Value unrankedSource = adaptor.getSource();
+    auto targetMemRefType = dyn_cast<MemRefType>(targetType);
+    Value unrankedTarget = adaptor.getTarget();
+
+    auto srcConverted = getTypeConverter()->getMemRefDescriptorFields(srcMemRefType, false);
+    auto srcStructType = mlir::LLVM::LLVMStructType::getLiteral(&(getTypeConverter()->getContext()), srcConverted);
+
+    auto targetConverted = getTypeConverter()->getMemRefDescriptorFields(targetMemRefType, false);
+    auto targetStructType = mlir::LLVM::LLVMStructType::getLiteral(&(getTypeConverter()->getContext()), targetConverted);
+
+    auto copyFn = LLVM::lookupOrCreateMemRefCopyFn1(
+        op->getParentOfType<ModuleOp>(), targetStructType, srcStructType, srcMemRefType.getShape().size());
+    if (failed(copyFn))
+      return failure();
+    rewriter.create<LLVM::CallOp>(loc, copyFn.value(),
+                                  ValueRange{unrankedSource, unrankedTarget});
+    rewriter.eraseOp(op);
+    return success();
+  }
+
+  LogicalResult
   lowerToMemCopyFunctionCall(memref::CopyOp op, OpAdaptor adaptor,
                              ConversionPatternRewriter &rewriter) const {
     auto loc = op.getLoc();
@@ -865,7 +914,7 @@ struct MemRefCopyOpLowering : public ConvertOpToLLVMPattern<memref::CopyOp> {
     if (isContiguousMemrefType(srcType) && isContiguousMemrefType(targetType))
       return lowerToMemCopyIntrinsic(op, adaptor, rewriter);
 
-    return lowerToMemCopyFunctionCall(op, adaptor, rewriter);
+    return lowerToMemCopyFunctionCall1(op, adaptor, rewriter);
   }
 };
 
@@ -1331,8 +1380,41 @@ struct SubViewOpLowering : public ConvertOpToLLVMPattern<memref::SubViewOp> {
   LogicalResult
   matchAndRewrite(memref::SubViewOp subViewOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    return rewriter.notifyMatchFailure(
-        subViewOp, "subview operations should have been expanded beforehand");
+    auto src =  adaptor.getSource();
+    auto funcOp = subViewOp->getParentOfType<mlir::func::FuncOp>();
+
+    // if (!funcOp.hasAttr("mpu")) {
+    //   rewriter.replaceOp(subViewOp, src);
+    //   return success();
+    // }
+
+    auto targetMemRefType = cast<MemRefType>(subViewOp.getType());
+    auto srcMemRefType = cast<MemRefType>(subViewOp.getSourceType());
+    auto loc = subViewOp->getLoc();
+
+    auto typeConverted = getTypeConverter()->getMemRefDescriptorFields(targetMemRefType, false);
+    auto targetStructType = mlir::LLVM::LLVMStructType::getLiteral(&(getTypeConverter()->getContext()), typeConverted);
+
+    auto allocFuncOp = mlir::LLVM::lookupOrCreateMemAllocFn1(
+         subViewOp->getParentOfType<ModuleOp>(), targetStructType, targetMemRefType.getShape().size());
+    if (failed(allocFuncOp))
+      return failure();
+    auto results = rewriter.create<LLVM::CallOp>(loc, allocFuncOp.value(), ValueRange{});
+
+    typeConverted = getTypeConverter()->getMemRefDescriptorFields(srcMemRefType, false);
+    auto srcStructType = mlir::LLVM::LLVMStructType::getLiteral(&(getTypeConverter()->getContext()), typeConverted);
+
+    auto copyFn = LLVM::lookupOrCreateMemRefCopyFn1(
+        subViewOp->getParentOfType<ModuleOp>(), targetStructType, srcStructType, srcMemRefType.getShape().size());
+    if (failed(copyFn))
+      return failure();
+    rewriter.create<LLVM::CallOp>(loc, copyFn.value(),
+                                  ValueRange{src, results->getResult(0)});
+
+    rewriter.replaceOp(subViewOp, results);
+    return success();
+   // return rewriter.notifyMatchFailure(
+   //     subViewOp, "subview operations should have been expanded beforehand");
   }
 };
 

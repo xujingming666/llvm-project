@@ -451,9 +451,9 @@ mlir::convertFuncOpToLLVMFuncOp(FunctionOpInterface funcOp,
         return funcOp.emitError("C interface for variadic functions is not "
                                 "supported yet.");
 
-      if (newFuncOp.isExternal())
-        wrapExternalFunction(rewriter, funcOp->getLoc(), converter, funcOp,
-                             newFuncOp);
+      if (newFuncOp.isExternal()) {}
+        //wrapExternalFunction(rewriter, funcOp->getLoc(), converter, funcOp,
+        //                     newFuncOp);
       else
         wrapForExternalCallers(rewriter, funcOp->getLoc(), converter, funcOp,
                                newFuncOp);

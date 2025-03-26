@@ -220,3 +220,17 @@ mlir::LLVM::lookupOrCreateMemRefCopyFn(Operation *moduleOp, Type indexType,
       ArrayRef<Type>{indexType, unrankedDescriptorType, unrankedDescriptorType},
       LLVM::LLVMVoidType::get(moduleOp->getContext()));
 }
+
+FailureOr<LLVM::LLVMFuncOp>
+mlir::LLVM::lookupOrCreateMemRefCopyFn1(Operation *moduleOp, Type targetType, Type srcType, int dim) {
+  return lookupOrCreateReservedFn(
+      moduleOp, ("memcopy_dim" + std::to_string(dim)),
+      ArrayRef<Type>{targetType, srcType},
+      LLVM::LLVMVoidType::get(moduleOp->getContext()));
+}
+
+FailureOr<LLVM::LLVMFuncOp>
+mlir::LLVM::lookupOrCreateMemAllocFn1(Operation *moduleOp, Type resultType, int dim) {
+  return lookupOrCreateReservedFn(moduleOp, ("memalloc_dim" + std::to_string(dim)),
+      ArrayRef<Type>{}, resultType);
+}

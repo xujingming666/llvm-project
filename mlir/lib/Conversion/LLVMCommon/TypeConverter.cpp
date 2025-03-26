@@ -767,11 +767,13 @@ LLVMTypeConverter::promoteOperands(Location loc, ValueRange opOperands,
                                          promotedOperands);
         continue;
       }
+#if 0
       if (auto memrefType = dyn_cast<MemRefType>(operand.getType())) {
         MemRefDescriptor::unpack(builder, loc, llvmOperand, memrefType,
                                  promotedOperands);
         continue;
       }
+#endif
     }
 
     promotedOperands.push_back(llvmOperand);
@@ -790,10 +792,12 @@ mlir::structFuncArgTypeConverter(const LLVMTypeConverter &converter, Type type,
     // In signatures, Memref descriptors are expanded into lists of
     // non-aggregate values.
     auto converted =
-        converter.getMemRefDescriptorFields(memref, /*unpackAggregates=*/true);
+        converter.getMemRefDescriptorFields(memref, /*unpackAggregates=*/false);
     if (converted.empty())
       return failure();
-    result.append(converted.begin(), converted.end());
+    auto structType = mlir::LLVM::LLVMStructType::getLiteral(&(converter.getContext()), converted);
+    result.push_back(structType);
+    //result.append(converted.begin(), converted.end());
     return success();
   }
   if (isa<UnrankedMemRefType>(type)) {
