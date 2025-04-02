@@ -2709,13 +2709,6 @@ void InsertSliceOp::getAsmResultNames(
   setNameFn(getResult(), "inserted_slice");
 }
 
-void InsertSliceOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  effects.emplace_back(MemoryEffects::Write::get(),
-                         &getDestMutable(), SideEffects::DefaultResource::get());
-}
-
 // Build a InsertSliceOp with mixed static and dynamic entries.
 void InsertSliceOp::build(OpBuilder &b, OperationState &result, Value source,
                           Value dest, ArrayRef<OpFoldResult> offsets,

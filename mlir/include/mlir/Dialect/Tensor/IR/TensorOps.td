@@ -836,9 +836,9 @@ def Tensor_InsertOp : Tensor_Op<"insert", [
 def Tensor_InsertSliceOp : Tensor_OpWithOffsetSizesAndStrides<"insert_slice", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     AttrSizedOperandSegments,
     DestinationStyleOpInterface,
+    Pure,
     OffsetSizeAndStrideOpInterface,
     TypesMatchWith<"expected result type to match dest type",
                    "dest", "result", "$_self">
