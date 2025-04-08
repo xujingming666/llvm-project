@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
@@ -147,6 +148,7 @@ FailureOr<func::FuncOp> mlir::outlineSingleBlockRegion(RewriterBase &rewriter,
   }
   for (Value value : outlinedValues) {
     if (value.getDefiningOp<arith::ConstantIndexOp>() != nullptr) continue;
+    if (value.getDefiningOp<tensor::EmptyOp>() != nullptr) continue;
     outlinedFuncArgTypes.push_back(value.getType());
     outlinedFuncArgLocs.push_back(value.getLoc());
   }
@@ -188,7 +190,8 @@ FailureOr<func::FuncOp> mlir::outlineSingleBlockRegion(RewriterBase &rewriter,
     //llvm::append_range(callValues, outlinedValues);
     llvm::append_range(callValues, llvm::filter_to_vector(outlinedValues, 
 			    [&](mlir::Value v) { 
-			    	return v.getDefiningOp<arith::ConstantIndexOp>() == nullptr; 
+			    	return v.getDefiningOp<arith::ConstantIndexOp>() == nullptr && 
+				       v.getDefiningOp<tensor::EmptyOp>() == nullptr; 
 			    }));
     auto call = rewriter.create<func::CallOp>(loc, outlinedFunc, callValues);
     if (callOp)
@@ -213,6 +216,9 @@ FailureOr<func::FuncOp> mlir::outlineSingleBlockRegion(RewriterBase &rewriter,
       OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(outlinedFuncBody);
       if (Operation *cst = orig.getDefiningOp<arith::ConstantIndexOp>()) {
+        IRMapping bvm;
+        repl = rewriter.clone(*cst, bvm)->getResult(0);
+      } else if (Operation *cst = orig.getDefiningOp<tensor::EmptyOp>()) {
         IRMapping bvm;
         repl = rewriter.clone(*cst, bvm)->getResult(0);
       } else {
