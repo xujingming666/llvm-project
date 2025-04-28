@@ -567,8 +567,9 @@ Type LLVMTypeConverter::convertUnrankedMemRefType(
     UnrankedMemRefType type) const {
   if (!convertType(type.getElementType()))
     return {};
-  return LLVM::LLVMStructType::getLiteral(&getContext(),
-                                          getUnrankedMemRefDescriptorFields());
+  return LLVM::LLVMPointerType::get(&getContext());
+  // return LLVM::LLVMStructType::getLiteral(&getContext(),
+  //                                         getUnrankedMemRefDescriptorFields());
 }
 
 FailureOr<unsigned>
@@ -801,10 +802,12 @@ mlir::structFuncArgTypeConverter(const LLVMTypeConverter &converter, Type type,
     return success();
   }
   if (isa<UnrankedMemRefType>(type)) {
-    auto converted = converter.getUnrankedMemRefDescriptorFields();
-    if (converted.empty())
-      return failure();
-    result.append(converted.begin(), converted.end());
+    auto converted = converter.convertUnrankedMemRefType(dyn_cast<UnrankedMemRefType>(type));
+    result.push_back(converted);
+    // auto converted = converter.getUnrankedMemRefDescriptorFields();
+    // if (converted.empty())
+    //   return failure();
+    // result.append(converted.begin(), converted.end());
     return success();
   }
   auto converted = converter.convertType(type);

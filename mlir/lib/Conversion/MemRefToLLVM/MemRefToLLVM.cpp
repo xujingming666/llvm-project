@@ -71,18 +71,67 @@ struct AllocOpLowering : public AllocLikeOpLLVMLowering {
     if (!isConvertibleAndHasIdentityMaps(memRefType))
       return rewriter.notifyMatchFailure(op, "incompatible memref type");
     auto loc = op->getLoc();
+    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
 
     auto typeConverted = getTypeConverter()->getMemRefDescriptorFields(memRefType, false);
     auto memrefStructType = mlir::LLVM::LLVMStructType::getLiteral(&(getTypeConverter()->getContext()), typeConverted);
+    
+    if (funcOp->hasAttr("mpu")) {
+      auto allocValue = MemRefDescriptor::poison(rewriter, loc, memrefStructType);
+      auto ptrType = mlir::LLVM::LLVMPointerType::get(&(getTypeConverter()->getContext()));
+      mlir::Value ptrValue = rewriter.create<LLVM::IntToPtrOp>(loc, ptrType,
+        ValueRange{rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(0))}
+      );
+      allocValue.setAllocatedPtr(rewriter, loc, ptrValue);
+      allocValue.setAlignedPtr(rewriter, loc, ptrValue);
 
-    auto allocFuncOp = mlir::LLVM::lookupOrCreateMemAllocFn1(
-         op->getParentOfType<ModuleOp>(), memrefStructType, memRefType.getShape().size());
-    if (failed(allocFuncOp))
-      return failure();
-    auto results = rewriter.create<LLVM::CallOp>(loc, allocFuncOp.value(), ValueRange{});
+      rewriter.replaceOp(op, (mlir::Value)allocValue);
+      return success();
+    }
 
-    rewriter.replaceOp(op, results);
+    auto elementType = memRefType.getElementType();
+    llvm::ArrayRef<int64_t> shape = memRefType.getShape();
+    int staticSize = 1;
+    mlir::Value dynamicSize = nullptr;
+    int dynIdx = 0;
+    for (int64_t dimV : shape) {
+      if (dimV == mlir::ShapedType::kDynamic) {
+        if (dynamicSize) {
+          dynamicSize = rewriter.create<LLVM::MulOp>(loc, dynamicSize, operands[dynIdx]);
+        } else {
+          dynamicSize = operands[dynIdx];
+        }
+        dynIdx++;
+      } else {
+        staticSize *= dimV;
+      }
+    }
+    mlir::Value staticSizeValue = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(staticSize));
+    if (dynamicSize) {
+      staticSizeValue = rewriter.create<LLVM::MulOp>(loc, dynamicSize, staticSizeValue);
+    }
+    
+    auto allocValue = MemRefDescriptor::poison(rewriter, loc, memrefStructType);
+    auto ptrType = mlir::LLVM::LLVMPointerType::get(&(getTypeConverter()->getContext()));
+    auto ptrValue = rewriter.create<LLVM::AllocaOp>(loc, ptrType, elementType, staticSizeValue);
+    allocValue.setAllocatedPtr(rewriter, loc, ptrValue);
+    allocValue.setAlignedPtr(rewriter, loc, ptrValue);
+    
+    rewriter.replaceOp(op, (mlir::Value)allocValue);
+
     return success();
+
+    // Value packValue = rewriter.create<mlir::LLVM::UndefOp>(loc, memrefStructType);
+    // MemRefDescriptor memrefValue(packValue);
+    
+    // auto allocFuncOp = mlir::LLVM::lookupOrCreateMemAllocFn1(
+    //      op->getParentOfType<ModuleOp>(), memrefStructType, memRefType.getShape().size());
+    // if (failed(allocFuncOp))
+    //   return failure();
+    // auto results = rewriter.create<LLVM::CallOp>(loc, allocFuncOp.value(), ValueRange{});
+
+    // rewriter.replaceOp(op, results);
+    // return success();
   }
 };
 
@@ -695,8 +744,7 @@ struct MemRefCastOpLowering : public ConvertOpToLLVMPattern<memref::CastOp> {
     if (isa<MemRefType>(srcType) && isa<MemRefType>(dstType))
       if (typeConverter->convertType(srcType) !=
           typeConverter->convertType(dstType))
-        return failure();
-
+        return failure();    
     // Unranked to unranked cast is disallowed
     if (isa<UnrankedMemRefType>(srcType) && isa<UnrankedMemRefType>(dstType))
       return failure();
@@ -1044,6 +1092,15 @@ static void extractPointersAndOffset(Location loc,
       *offset = desc.offset(rewriter, loc);
     return;
   }
+  if (isa<UnrankedMemRefType>(operandType)) {
+    *allocatedPtr = convertedOperand;
+    *alignedPtr = convertedOperand;
+    if (offset != nullptr) {
+      *offset =  rewriter.create<mlir::LLVM::ConstantOp>(
+        loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+    }
+    return;
+  }
 
   // These will all cause assert()s on unconvertible types.
   unsigned memorySpace = *typeConverter.getMemRefAddressSpace(
@@ -1372,25 +1429,330 @@ public:
   }
 };
 
+struct CallOpLowering : public ConvertOpToLLVMPattern<mlir::func::CallOp> {
+public:
+  using ConvertOpToLLVMPattern<func::CallOp>::ConvertOpToLLVMPattern;
+
+  mlir::memref::SubViewOp getSubviewOp(mlir::Value value) const {
+    if (auto op = value.getDefiningOp<mlir::memref::CastOp>()) {
+      return getSubviewOp(op.getSource());
+    }
+    if (auto op = value.getDefiningOp<mlir::memref::SubViewOp>()) {
+      return op;
+    }
+    return nullptr;
+  }
+
+  void getMixedValues(ConversionPatternRewriter &rewriter,
+                      mlir::Location &loc,
+                      llvm::ArrayRef<int64_t> staticValues, 
+                      llvm::SmallVector<mlir::Value> dynValues, 
+                      llvm::SmallVector<mlir::Value> &mixedValues) {
+    int dynIdx = 0;
+    for (auto staticValue : staticValues) {
+      if (staticValue == ShapedType::kDynamic) {
+        mixedValues.push_back(dynValues[dynIdx]);
+        dynIdx++;
+      } else {
+        mlir::Value constStaticValue = rewriter.create<mlir::LLVM::ConstantOp>(
+          loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(staticValue));
+          mixedValues.push_back(constStaticValue);
+      }
+    }
+  }
+
+  void getOffsetStepValues(ConversionPatternRewriter &rewriter,
+                           mlir::Location &loc,
+                           mlir::memref::SubViewOp subviewOp,
+                           MemRefDescriptor memrefValue,
+                           int bpe,
+                           mlir::Value &offset,
+                           mlir::Value &step) {
+    if (subviewOp != nullptr) {
+      ::llvm::ArrayRef<int64_t> staticOffsets, staticSizes, staticSourceSizes;
+      staticOffsets = subviewOp.getStaticOffsets();
+      staticSizes = subviewOp.getStaticSizes();
+      staticSourceSizes = subviewOp.getViewSource().
+                          getType().dyn_cast<MemRefType>().getShape();
+      
+      llvm::SmallVector<mlir::Value> dynamicOffsets, dynamicSizes;
+      rewriter.getRemappedValues(subviewOp.getOffsets(), dynamicOffsets);
+      rewriter.getRemappedValues(subviewOp.getSizes(), dynamicSizes);
+
+      llvm::SmallVector<mlir::Value> mixedOffsets, mixedSizes, mixedSourceSizes;
+
+      const_cast<CallOpLowering *>(this)->getMixedValues(
+          rewriter, loc, staticOffsets, dynamicOffsets, mixedOffsets);
+      const_cast<CallOpLowering *>(this)->getMixedValues(
+          rewriter, loc, staticSizes, dynamicSizes, mixedSizes);
+
+      for (auto it : llvm::enumerate(staticSourceSizes)) {
+        if (it.value() == ShapedType::kDynamic) {
+          mixedSourceSizes.push_back(memrefValue.size(rewriter, loc, it.index()));
+        } else {
+          mlir::Value sizeValue = rewriter.create<mlir::LLVM::ConstantOp>(
+            loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(it.value()));
+          mixedSourceSizes.push_back(sizeValue);
+        }
+      }
+      offset = rewriter.create<mlir::LLVM::MulOp>(
+                              loc, mixedSourceSizes[0], mixedOffsets[1]);
+      offset = rewriter.create<mlir::LLVM::AddOp>(
+                              loc, offset, mixedOffsets[0]);
+      offset = rewriter.create<mlir::LLVM::MulOp>(
+        loc, offset, rewriter.create<mlir::LLVM::ConstantOp>(
+          loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(bpe))
+        );
+
+      step = mixedSourceSizes[0];
+      step = rewriter.create<mlir::LLVM::MulOp>(
+        loc, step, rewriter.create<mlir::LLVM::ConstantOp>(
+          loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(bpe))
+        );
+    } else {
+      offset = rewriter.create<mlir::LLVM::ConstantOp>(
+        loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+      step = rewriter.create<mlir::LLVM::MulOp>(
+        loc, memrefValue.size(rewriter, loc, 0), 
+        rewriter.create<mlir::LLVM::ConstantOp>(
+          loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(bpe))
+        );
+    }
+  }
+
+  LogicalResult
+  matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = callOp.getLoc();
+    auto funcOp = callOp->getParentOfType<mlir::func::FuncOp>();
+    
+    if (funcOp->hasAttr("mpu")) {
+      if (StringRef::npos != callOp.getCallee().find("linalg_matmul")) {
+        auto lhsSubviewOp = getSubviewOp(callOp.getOperands()[0]);
+        auto rhsSubviewOp = getSubviewOp(callOp.getOperands()[1]);
+        auto inoutSubviewOp = getSubviewOp(callOp.getOperands()[2]);
+
+        auto elementType = callOp.getCalleeType().getInput(0).
+                            dyn_cast<MemRefType>().getElementType();
+        int bpe = elementType.getIntOrFloatBitWidth();
+        int dim = callOp.getCalleeType().getInput(0).
+                    dyn_cast<MemRefType>().getShape().size();
+        assert(dim == 2 && " matmul should be tiled to 2 dim \n");
+
+        MemRefDescriptor memrefLhs(adaptor.getOperands()[0]);
+        MemRefDescriptor memrefRhs(adaptor.getOperands()[1]);
+        MemRefDescriptor memrefInout(adaptor.getOperands()[2]);
+        
+        auto lhsSrcAddr = memrefLhs.allocatedPtr(rewriter, loc);
+        auto rhsSrcAddr = memrefRhs.allocatedPtr(rewriter, loc);
+        auto outSrcAddr = memrefInout.allocatedPtr(rewriter, loc);
+
+        mlir::Value lhsOffsetValue, lhsStepValue;
+        const_cast<CallOpLowering *>(this)->getOffsetStepValues(
+                  rewriter, loc, lhsSubviewOp, memrefLhs, bpe, 
+                  lhsOffsetValue, lhsStepValue);
+        
+        mlir::Value rhsOffsetValue, rhsStepValue;
+        const_cast<CallOpLowering *>(this)->getOffsetStepValues(
+                  rewriter, loc, rhsSubviewOp, memrefRhs, bpe, 
+                  rhsOffsetValue, rhsStepValue);
+        
+        mlir::Value outOffsetValue, outStepValue;
+        const_cast<CallOpLowering *>(this)->getOffsetStepValues(
+                  rewriter, loc, inoutSubviewOp, memrefInout, bpe, 
+                  outOffsetValue, outStepValue);
+
+        auto loadResultType = mlir::LLVM::getVectorType(elementType, 512/elementType.getIntOrFloatBitWidth());
+        auto mmaResultType = mlir::LLVM::getVectorType(elementType, 512/elementType.getIntOrFloatBitWidth());
+        
+        auto rhsPackType = mlir::LLVM::LLVMArrayType::get(loadResultType, 8);
+        Value rhsPackValue = rewriter.create<mlir::LLVM::UndefOp>(loc, rhsPackType);
+
+        for (int i = 0; i < 8; i++) {
+          Value iConstValue = rewriter.create<mlir::LLVM::ConstantOp>(
+            loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(i));
+          Value iRhsOffset = rewriter.create<mlir::LLVM::MulOp>(loc, iConstValue, rhsStepValue);
+          iRhsOffset = rewriter.create<mlir::LLVM::AddOp>(loc, iRhsOffset, rhsOffsetValue);
+
+          Value rhsPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, rhsSrcAddr.getType(), 
+            rhsSrcAddr.getType(), rhsSrcAddr, ValueRange{iRhsOffset});
+
+          Value loadResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
+            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{rhsPtr})->getResult(0);
+          rhsPackValue = rewriter.create<mlir::LLVM::InsertValueOp>(loc, 
+              rhsPackValue, loadResult, ::llvm::ArrayRef<int64_t>{i});
+        }
+        
+        for (int i = 0; i < 8; i++) {
+          Value iConstValue = rewriter.create<mlir::LLVM::ConstantOp>(
+            loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(i));
+          Value iLhsOffset = rewriter.create<mlir::LLVM::MulOp>(loc, iConstValue, lhsStepValue);
+          iLhsOffset = rewriter.create<mlir::LLVM::AddOp>(loc, iLhsOffset, lhsOffsetValue);
+          Value lhsPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, lhsSrcAddr.getType(), 
+            lhsSrcAddr.getType(), lhsSrcAddr, ValueRange{iLhsOffset});
+
+          Value lhsLoadResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
+            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{lhsPtr})->getResult(0);
+
+          Value index = rewriter.create<mlir::LLVM::ConstantOp>(
+            loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(i));
+          
+          Value iOutOffset = rewriter.create<mlir::LLVM::MulOp>(loc, iConstValue, outStepValue);
+          iOutOffset = rewriter.create<mlir::LLVM::AddOp>(loc, iOutOffset, outOffsetValue);
+
+          Value outPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, outSrcAddr.getType(), 
+            outSrcAddr.getType(), outSrcAddr, ValueRange{iOutOffset});
+          Value outLoadResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
+            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{outPtr})->getResult(0);
+
+          // mma
+          Value mmaResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, mmaResultType,
+            rewriter.getStringAttr("llvm.mma"), ValueRange{lhsLoadResult, rhsPackValue, index, outLoadResult})->getResult(0);
+          
+          // store out
+          rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
+            rewriter.getStringAttr("llvm.aurora_store"), ValueRange{outPtr, mmaResult})->getResult(0);
+        }
+
+        rewriter.eraseOp(callOp);
+        return success();
+      }
+      
+      if (StringRef::npos != callOp.getCallee().find("linalg_add")) {
+
+        auto lhsSubviewOp = getSubviewOp(callOp.getOperands()[0]);
+        auto rhsSubviewOp = getSubviewOp(callOp.getOperands()[1]);
+        auto inoutSubviewOp = getSubviewOp(callOp.getOperands()[2]);
+
+        auto elementType = callOp.getCalleeType().getInput(0).
+                            dyn_cast<MemRefType>().getElementType();
+        int bpe = elementType.getIntOrFloatBitWidth();
+        int dim = callOp.getCalleeType().getInput(0).
+                    dyn_cast<MemRefType>().getShape().size();
+        assert(dim == 2 && " add should be tiled to 2 dim \n");
+
+        MemRefDescriptor memrefLhs(adaptor.getOperands()[0]);
+        MemRefDescriptor memrefRhs(adaptor.getOperands()[1]);
+        MemRefDescriptor memrefInout(adaptor.getOperands()[2]);
+        
+        auto lhsSrcAddr = memrefLhs.allocatedPtr(rewriter, loc);
+        auto rhsSrcAddr = memrefRhs.allocatedPtr(rewriter, loc);
+        auto outSrcAddr = memrefInout.allocatedPtr(rewriter, loc);
+
+        mlir::Value lhsOffsetValue, lhsStepValue;
+        const_cast<CallOpLowering *>(this)->getOffsetStepValues(
+                  rewriter, loc, lhsSubviewOp, memrefLhs, bpe, 
+                  lhsOffsetValue, lhsStepValue);
+        
+        mlir::Value rhsOffsetValue, rhsStepValue;
+        const_cast<CallOpLowering *>(this)->getOffsetStepValues(
+                  rewriter, loc, rhsSubviewOp, memrefRhs, bpe, 
+                  rhsOffsetValue, rhsStepValue);
+        
+        mlir::Value outOffsetValue, outStepValue;
+        const_cast<CallOpLowering *>(this)->getOffsetStepValues(
+                  rewriter, loc, inoutSubviewOp, memrefInout, bpe, 
+                  outOffsetValue, outStepValue);
+  
+        auto loadResultType = mlir::LLVM::getVectorType(elementType, 512/elementType.getIntOrFloatBitWidth());
+        auto shape = callOp.getCalleeType().getInput(0).dyn_cast<MemRefType>().getShape();
+        int vectorNum = 1;
+        for (int i=0; i < shape.size(); i++) {
+          vectorNum *= shape[i];
+        }
+        vectorNum = vectorNum/(512/elementType.getIntOrFloatBitWidth());
+        
+        for (int i=0; i < vectorNum; i++) {
+          Value iConstValue = rewriter.create<mlir::LLVM::ConstantOp>(
+            loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(i));
+          Value iLhsOffset = rewriter.create<mlir::LLVM::MulOp>(loc, iConstValue, lhsStepValue);
+          iLhsOffset = rewriter.create<mlir::LLVM::AddOp>(loc, iLhsOffset, lhsOffsetValue);
+          Value lhsPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, lhsSrcAddr.getType(), 
+            lhsSrcAddr.getType(), lhsSrcAddr, ValueRange{iLhsOffset});
+  
+          Value lhsResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
+            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{lhsPtr})->getResult(0);
+          
+          Value iRhsOffset = rewriter.create<mlir::LLVM::MulOp>(loc, iConstValue, rhsStepValue);
+          iRhsOffset = rewriter.create<mlir::LLVM::AddOp>(loc, iRhsOffset, rhsOffsetValue);
+          Value rhsPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, rhsSrcAddr.getType(), 
+            rhsSrcAddr.getType(), rhsSrcAddr, ValueRange{iRhsOffset});
+          
+          Value rhsResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
+            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{rhsPtr})->getResult(0);
+          
+          Value addResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
+            rewriter.getStringAttr("llvm.add"), ValueRange{lhsResult, rhsResult})->getResult(0);
+          
+          Value iOutOffset = rewriter.create<mlir::LLVM::MulOp>(loc, iConstValue, outStepValue);
+          iOutOffset = rewriter.create<mlir::LLVM::AddOp>(loc, iOutOffset, outOffsetValue);
+          Value outPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, outSrcAddr.getType(), 
+            outSrcAddr.getType(), outSrcAddr, ValueRange{iOutOffset});
+          
+          rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
+            rewriter.getStringAttr("llvm.aurora_store"), ValueRange{outPtr, addResult})->getResult(0);
+        }
+  
+        rewriter.eraseOp(callOp);
+      }
+    }
+    
+    return success();
+  }
+};
+
 /// Subviews must be expanded before we reach this stage.
 /// Report that information.
 struct SubViewOpLowering : public ConvertOpToLLVMPattern<memref::SubViewOp> {
   using ConvertOpToLLVMPattern<memref::SubViewOp>::ConvertOpToLLVMPattern;
+
+  llvm::MapVector<mlir::Operation *, int> getSubViewUsers(mlir::Operation *rootOp) {
+    llvm::MapVector<mlir::Operation *, int> useOps;
+    llvm::SmallVector<mlir::Operation *> naviOps;
+    naviOps.push_back(rootOp);
+
+    while(!naviOps.empty()) {
+      auto naviOp = naviOps.back();
+      naviOps.pop_back();
+
+      for (auto & useOp : naviOp->getUses()) {
+        if (mlir::dyn_cast<mlir::memref::CastOp>(useOp.getOwner())) {
+          naviOps.push_back(useOp.getOwner());
+        } else {
+          useOps[useOp.getOwner()] = useOp.getOperandNumber();
+        }
+      }
+    }
+    return useOps;
+  }
+
+  bool isMatmulOperand(memref::SubViewOp rootOp, int &operandIdx) {
+    auto users = getSubViewUsers(rootOp);
+    for (auto it : users) {
+      if (auto callOp = mlir::dyn_cast<mlir::func::CallOp>(it.first)) {
+        if (StringRef::npos != callOp.getCallee().find("linalg_matmul")){
+          operandIdx = it.second;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
   LogicalResult
   matchAndRewrite(memref::SubViewOp subViewOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto src =  adaptor.getSource();
     auto funcOp = subViewOp->getParentOfType<mlir::func::FuncOp>();
+    auto loc = subViewOp->getLoc();
 
-    // if (!funcOp.hasAttr("mpu")) {
-    //   rewriter.replaceOp(subViewOp, src);
-    //   return success();
-    // }
+    if (funcOp->hasAttr("mpu")) {
+      rewriter.replaceOp(subViewOp, src);
+      return success();
+    }
 
     auto targetMemRefType = cast<MemRefType>(subViewOp.getType());
     auto srcMemRefType = cast<MemRefType>(subViewOp.getSourceType());
-    auto loc = subViewOp->getLoc();
 
     auto typeConverted = getTypeConverter()->getMemRefDescriptorFields(targetMemRefType, false);
     auto targetStructType = mlir::LLVM::LLVMStructType::getLiteral(&(getTypeConverter()->getContext()), typeConverted);
@@ -1764,7 +2126,8 @@ void mlir::populateFinalizeMemRefToLLVMConversionPatterns(
       StoreOpLowering,
       SubViewOpLowering,
       TransposeOpLowering,
-      ViewOpLowering>(converter);
+      ViewOpLowering,
+      CallOpLowering>(converter);
   // clang-format on
   auto allocLowering = converter.getOptions().allocLowering;
   if (allocLowering == LowerToLLVMOptions::AllocLowering::AlignedAlloc)

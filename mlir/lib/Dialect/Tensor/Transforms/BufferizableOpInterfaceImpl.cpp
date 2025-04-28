@@ -14,8 +14,10 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/IR/DstBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/SubsetInsertionOpInterfaceImpl.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -373,7 +375,7 @@ struct ExtractSliceOpInterface
     SmallVector<OpFoldResult> mixedSizes = extractSliceOp.getMixedSizes();
     SmallVector<OpFoldResult> mixedStrides = extractSliceOp.getMixedStrides();
     Location loc = extractSliceOp.getLoc();
-
+    
     // Get source buffer.
     FailureOr<Value> srcMemref =
         getBuffer(rewriter, extractSliceOp.getSource(), options);
@@ -385,6 +387,70 @@ struct ExtractSliceOpInterface
         bufferization::getBufferType(extractSliceOp.getResult(), options);
     if (failed(resultMemrefType))
       return failure();
+    
+    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
+    if (!funcOp->hasAttr("mpu")) {
+      SmallVector<int64_t> staticOffsets;
+      SmallVector<Value> dynamicOffsets;
+      dispatchIndexOpFoldResults(mixedOffsets, dynamicOffsets, staticOffsets);
+
+      auto shape = extractSliceOp.getType().getShape();
+      auto elementType = extractSliceOp.getType().getElementType();
+      llvm::SmallVector<int64_t> dynShapes(shape.size(), mlir::ShapedType::kDynamic);
+      auto gMemrefType = mlir::MemRefType::get(dynShapes, elementType);
+      std::string funcName("ddr2dm" + llvm::itostr(shape.size()));
+      auto dmMemRefType = mlir::MemRefType::get(shape, elementType);
+      auto dynSizes = extractSliceOp.getDynamicSizes();
+      mlir::Value dmValue = rewriter.create<memref::AllocOp>(loc, 
+                              dmMemRefType, ValueRange{dynSizes});
+      
+      auto offsetMemrefType = mlir::MemRefType::get({shape.size()}, rewriter.getIndexType());
+      mlir::Value offsetValue = rewriter.create<memref::AllocOp>(loc, offsetMemrefType);
+      int dynIdx = 0;
+      for (int i=0; i<shape.size(); i++) {
+        if (staticOffsets[i] != mlir::ShapedType::kDynamic) {
+          rewriter.create<memref::StoreOp>(loc, 
+              rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(staticOffsets[i])),
+              offsetValue, 
+              ValueRange{
+                rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
+              });
+        } else {
+          rewriter.create<memref::StoreOp>(loc, dynamicOffsets[dynIdx], offsetValue, 
+            ValueRange{
+              rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
+            });
+          dynIdx++;
+        }
+      }
+
+      rewriter.create<func::CallOp>(loc, funcName, TypeRange(),
+                  ValueRange{
+                    rewriter.create<memref::CastOp>(loc, gMemrefType, dmValue), 
+                    rewriter.create<memref::CastOp>(loc, gMemrefType, *srcMemref),
+                    offsetValue
+                  });
+      replaceOpWithBufferizedValues(rewriter, op, dmValue);
+      
+      auto moduleOp = funcOp->getParentOfType<mlir::ModuleOp>();
+      FlatSymbolRefAttr fnNameAttr =
+          SymbolRefAttr::get(rewriter.getContext(), funcName);
+
+      if (!moduleOp.lookupSymbol(fnNameAttr.getAttr())) {
+        auto libFnType = rewriter.getFunctionType({gMemrefType, gMemrefType, offsetMemrefType}, {});
+        OpBuilder::InsertionGuard guard(rewriter);
+        // Insert before module terminator.
+        rewriter.setInsertionPoint(moduleOp.getBody(),
+                                  std::prev(moduleOp.getBody()->end()));
+        func::FuncOp dmaFuncOp = rewriter.create<func::FuncOp>(moduleOp.getLoc(), funcName, libFnType);
+        dmaFuncOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                        UnitAttr::get(dmaFuncOp->getContext()));
+        dmaFuncOp.setPrivate();
+      }
+      
+      return success();
+    }
+
     Value subView = rewriter.create<memref::SubViewOp>(
         loc, llvm::cast<MemRefType>(*resultMemrefType), *srcMemref,
         mixedOffsets, mixedSizes, mixedStrides);
@@ -687,6 +753,69 @@ struct InsertSliceOpInterface
         getBuffer(rewriter, insertSliceOp.getDest(), options);
     if (failed(dstMemref))
       return failure();
+    
+    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
+    if (!funcOp->hasAttr("mpu")) {
+      SmallVector<int64_t> staticOffsets;
+      SmallVector<Value> dynamicOffsets;
+      dispatchIndexOpFoldResults(mixedOffsets, dynamicOffsets, staticOffsets);
+
+      auto shape = insertSliceOp.getSourceType().getShape();
+      auto elementType = insertSliceOp.getSourceType().getElementType();
+      llvm::SmallVector<int64_t> dynShapes(shape.size(), mlir::ShapedType::kDynamic);
+      auto gMemrefType = mlir::MemRefType::get(dynShapes, elementType);
+      std::string funcName("dm2ddr" + llvm::itostr(shape.size()));
+      auto dmMemRefType = mlir::MemRefType::get(shape, elementType);
+      auto dynSizes = insertSliceOp.getDynamicSizes();
+      mlir::Value dmValue = rewriter.create<memref::AllocOp>(loc, 
+                              dmMemRefType, ValueRange{dynSizes});
+      
+      auto offsetMemrefType = mlir::MemRefType::get({shape.size()}, rewriter.getIndexType());
+      mlir::Value offsetValue = rewriter.create<memref::AllocOp>(loc, offsetMemrefType);
+      int dynIdx = 0;
+      for (int i=0; i<shape.size(); i++) {
+        if (staticOffsets[i] != mlir::ShapedType::kDynamic) {
+          rewriter.create<memref::StoreOp>(loc, 
+              rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(staticOffsets[i])),
+              offsetValue, 
+              ValueRange{
+                rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
+              });
+        } else {
+          rewriter.create<memref::StoreOp>(loc, dynamicOffsets[dynIdx], offsetValue, 
+            ValueRange{
+              rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
+            });
+          dynIdx++;
+        }
+      }
+
+      rewriter.create<func::CallOp>(loc, funcName, TypeRange(),
+                  ValueRange{
+                    rewriter.create<memref::CastOp>(loc, gMemrefType, *dstMemref),
+                    rewriter.create<memref::CastOp>(loc, gMemrefType, dmValue), 
+                    offsetValue
+                  });
+      replaceOpWithBufferizedValues(rewriter, op, *dstMemref);
+      
+      auto moduleOp = funcOp->getParentOfType<mlir::ModuleOp>();
+      FlatSymbolRefAttr fnNameAttr =
+          SymbolRefAttr::get(rewriter.getContext(), funcName);
+
+      if (!moduleOp.lookupSymbol(fnNameAttr.getAttr())) {
+        auto libFnType = rewriter.getFunctionType({gMemrefType, gMemrefType, offsetMemrefType}, {});
+        OpBuilder::InsertionGuard guard(rewriter);
+        // Insert before module terminator.
+        rewriter.setInsertionPoint(moduleOp.getBody(),
+                                  std::prev(moduleOp.getBody()->end()));
+        func::FuncOp dmaFuncOp = rewriter.create<func::FuncOp>(moduleOp.getLoc(), funcName, libFnType);
+        dmaFuncOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                        UnitAttr::get(dmaFuncOp->getContext()));
+        dmaFuncOp.setPrivate();
+      }
+      
+      return success();
+    }
 
     // Take a subview of the destination buffer.
     auto dstMemrefType = cast<MemRefType>(dstMemref->getType());
