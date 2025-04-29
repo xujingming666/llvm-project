@@ -1578,7 +1578,7 @@ public:
             rhsSrcAddr.getType(), rhsSrcAddr, ValueRange{iRhsOffset});
 
           Value loadResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
-            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{rhsPtr})->getResult(0);
+            rewriter.getStringAttr("llvm.x86.aurora.load"), ValueRange{rhsPtr})->getResult(0);
           rhsPackValue = rewriter.create<mlir::LLVM::InsertValueOp>(loc, 
               rhsPackValue, loadResult, ::llvm::ArrayRef<int64_t>{i});
         }
@@ -1592,7 +1592,7 @@ public:
             lhsSrcAddr.getType(), lhsSrcAddr, ValueRange{iLhsOffset});
 
           Value lhsLoadResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
-            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{lhsPtr})->getResult(0);
+            rewriter.getStringAttr("llvm.x86.aurora.load"), ValueRange{lhsPtr})->getResult(0);
 
           Value index = rewriter.create<mlir::LLVM::ConstantOp>(
             loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(i));
@@ -1603,15 +1603,15 @@ public:
           Value outPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, outSrcAddr.getType(), 
             outSrcAddr.getType(), outSrcAddr, ValueRange{iOutOffset});
           Value outLoadResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
-            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{outPtr})->getResult(0);
+            rewriter.getStringAttr("llvm.x86.aurora.load"), ValueRange{outPtr})->getResult(0);
 
           // mma
           Value mmaResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, mmaResultType,
-            rewriter.getStringAttr("llvm.mma"), ValueRange{lhsLoadResult, rhsPackValue, index, outLoadResult})->getResult(0);
+            rewriter.getStringAttr("llvm.x86.aurora.mma"), ValueRange{lhsLoadResult, rhsPackValue, index, outLoadResult})->getResult(0);
           
           // store out
-          rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
-            rewriter.getStringAttr("llvm.aurora_store"), ValueRange{outPtr, mmaResult})->getResult(0);
+          rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, 
+            rewriter.getStringAttr("llvm.x86.aurora.store"), ValueRange{outPtr, mmaResult});
         }
 
         rewriter.eraseOp(callOp);
@@ -1671,7 +1671,7 @@ public:
             lhsSrcAddr.getType(), lhsSrcAddr, ValueRange{iLhsOffset});
   
           Value lhsResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
-            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{lhsPtr})->getResult(0);
+            rewriter.getStringAttr("llvm.x86.aurora.load"), ValueRange{lhsPtr})->getResult(0);
           
           Value iRhsOffset = rewriter.create<mlir::LLVM::MulOp>(loc, iConstValue, rhsStepValue);
           iRhsOffset = rewriter.create<mlir::LLVM::AddOp>(loc, iRhsOffset, rhsOffsetValue);
@@ -1679,20 +1679,19 @@ public:
             rhsSrcAddr.getType(), rhsSrcAddr, ValueRange{iRhsOffset});
           
           Value rhsResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
-            rewriter.getStringAttr("llvm.aurora_load"), ValueRange{rhsPtr})->getResult(0);
+            rewriter.getStringAttr("llvm.x86.aurora.load"), ValueRange{rhsPtr})->getResult(0);
           
           Value addResult = rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
-            rewriter.getStringAttr("llvm.add"), ValueRange{lhsResult, rhsResult})->getResult(0);
+            rewriter.getStringAttr("llvm.x86.aurora.add"), ValueRange{lhsResult, rhsResult})->getResult(0);
           
           Value iOutOffset = rewriter.create<mlir::LLVM::MulOp>(loc, iConstValue, outStepValue);
           iOutOffset = rewriter.create<mlir::LLVM::AddOp>(loc, iOutOffset, outOffsetValue);
           Value outPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, outSrcAddr.getType(), 
             outSrcAddr.getType(), outSrcAddr, ValueRange{iOutOffset});
           
-          rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc, loadResultType,
-            rewriter.getStringAttr("llvm.aurora_store"), ValueRange{outPtr, addResult})->getResult(0);
+          rewriter.create<mlir::LLVM::CallIntrinsicOp>(loc,
+            rewriter.getStringAttr("llvm.x86.aurora.store"), ValueRange{outPtr, addResult});
         }
-  
         rewriter.eraseOp(callOp);
       }
     }

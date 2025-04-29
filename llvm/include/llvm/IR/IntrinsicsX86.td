@@ -6403,6 +6403,18 @@ let TargetPrefix = "x86" in {
   def int_x86_axor64
       : ClangBuiltin<"__builtin_ia32_axor64">,
         Intrinsic<[], [llvm_ptr_ty, llvm_i64_ty], [IntrArgMemOnly]>;
+  def int_x86_aurora_load
+      : ClangBuiltin<"__builtin_aurora_load">,
+        Intrinsic<[llvm_v16f32_ty], [llvm_ptr_ty], [IntrArgMemOnly]>;
+  def int_x86_aurora_store
+      : ClangBuiltin<"__builtin_aurora_store">,
+        Intrinsic<[], [llvm_ptr_ty, llvm_v16f32_ty], [IntrArgMemOnly]>;
+  def int_x86_aurora_add
+      : ClangBuiltin<"__builtin_aurora_add">,
+        Intrinsic<[llvm_v16f32_ty], [llvm_v16f32_ty, llvm_v16f32_ty], [IntrNoMem]>;
+  def int_x86_aurora_mma
+      : ClangBuiltin<"__builtin_aurora_mma">,
+        Intrinsic<[llvm_v16f32_ty], [llvm_v16f32_ty, llvm_any_ty, llvm_i32_ty, llvm_v16f32_ty], [IntrNoMem]>;
 }
 
 //===----------------------------------------------------------------------===//
