@@ -404,22 +404,32 @@ struct ExtractSliceOpInterface
       mlir::Value dmValue = rewriter.create<memref::AllocOp>(loc, 
                               dmMemRefType, ValueRange{dynSizes});
       
-      auto offsetMemrefType = mlir::MemRefType::get({shape.size()}, rewriter.getIndexType());
+      auto offsetMemrefType = mlir::MemRefType::get({shape.size()}, rewriter.getI32Type());
       mlir::Value offsetValue = rewriter.create<memref::AllocOp>(loc, offsetMemrefType);
       int dynIdx = 0;
       for (int i=0; i<shape.size(); i++) {
         if (staticOffsets[i] != mlir::ShapedType::kDynamic) {
           rewriter.create<memref::StoreOp>(loc, 
-              rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(staticOffsets[i])),
+              rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(staticOffsets[i])),
               offsetValue, 
               ValueRange{
                 rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
               });
         } else {
-          rewriter.create<memref::StoreOp>(loc, dynamicOffsets[dynIdx], offsetValue, 
-            ValueRange{
-              rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
-            });
+          if (dynamicOffsets[dynIdx].getType() == rewriter.getIndexType()) {
+            rewriter.create<memref::StoreOp>(loc, 
+              rewriter.create<arith::IndexCastUIOp>(loc, 
+                  rewriter.getI32Type(), dynamicOffsets[dynIdx]),
+              offsetValue, 
+              ValueRange{
+                rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
+              });
+          } else {
+            rewriter.create<memref::StoreOp>(loc, dynamicOffsets[dynIdx], offsetValue, 
+              ValueRange{
+                rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
+              });
+          }
           dynIdx++;
         }
       }
@@ -770,22 +780,33 @@ struct InsertSliceOpInterface
       mlir::Value dmValue = rewriter.create<memref::AllocOp>(loc, 
                               dmMemRefType, ValueRange{dynSizes});
       
-      auto offsetMemrefType = mlir::MemRefType::get({shape.size()}, rewriter.getIndexType());
+      auto offsetMemrefType = mlir::MemRefType::get({shape.size()}, rewriter.getI32Type());
       mlir::Value offsetValue = rewriter.create<memref::AllocOp>(loc, offsetMemrefType);
       int dynIdx = 0;
       for (int i=0; i<shape.size(); i++) {
         if (staticOffsets[i] != mlir::ShapedType::kDynamic) {
           rewriter.create<memref::StoreOp>(loc, 
-              rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(staticOffsets[i])),
+              rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(staticOffsets[i])),
               offsetValue, 
               ValueRange{
                 rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
               });
         } else {
-          rewriter.create<memref::StoreOp>(loc, dynamicOffsets[dynIdx], offsetValue, 
-            ValueRange{
-              rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
-            });
+          if (dynamicOffsets[dynIdx].getType() == rewriter.getIndexType()) {
+            rewriter.create<memref::StoreOp>(loc, 
+              rewriter.create<arith::IndexCastUIOp>(loc, 
+                  rewriter.getI32Type(), dynamicOffsets[dynIdx]),
+              offsetValue, 
+              ValueRange{
+                rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
+              });
+          } else {
+            rewriter.create<memref::StoreOp>(loc, dynamicOffsets[dynIdx], offsetValue, 
+              ValueRange{
+                rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i))
+              });
+          }
+          
           dynIdx++;
         }
       }
