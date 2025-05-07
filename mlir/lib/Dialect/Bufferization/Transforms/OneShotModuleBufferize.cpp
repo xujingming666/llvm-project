@@ -550,7 +550,7 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
     }
 
     // Change buffer return types to more precise layout maps.
-    if (options.inferFunctionResultLayout)
+    if (options.inferFunctionResultLayout || funcOp->hasAttr("mpu"))
       foldMemRefCasts(funcOp);
   }
 

@@ -387,6 +387,7 @@ void BufferizationOptions::setFunctionBoundaryTypeConversion(
   };
   inferFunctionResultLayout =
       layoutMapOption == LayoutMapOption::InferLayoutMap;
+  inferFunctionResultLayout = false;
 }
 
 //===----------------------------------------------------------------------===//
