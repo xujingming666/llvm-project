@@ -280,13 +280,20 @@ static void restoreByValRefArgumentType(
 
   ConversionPatternRewriter::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+  
+  for (const auto &[arg, oldArg] : llvm::zip(funcOp.getArguments(), oldBlockArgs)) {
+    if (auto memrefType = dyn_cast<MemRefType>(oldArg.getType())) {
+      auto structMemrefType = typeConverter.convertType(memrefType);
+      auto valueArg = rewriter.create<LLVM::LoadOp>(arg.getLoc(), structMemrefType, arg);
+      rewriter.replaceUsesOfBlockArgument(oldArg, valueArg);
+    }
+  }
 
   for (const auto &[arg, oldArg, byValRefAttr] :
        llvm::zip(funcOp.getArguments(), oldBlockArgs, byValRefNonPtrAttrs)) {
     // Skip argument if no `llvm.byval` or `llvm.byref` attribute.
     if (!byValRefAttr)
       continue;
-
     // Insert load to retrieve the actual argument passed by value/reference.
     assert(isa<LLVM::LLVMPointerType>(arg.getType()) &&
            "Expected LLVM pointer type for argument with "
@@ -694,9 +701,11 @@ struct ReturnOpLowering : public ConvertOpToLLVMPattern<func::ReturnOp> {
       }
     } else {
       updatedOperands = llvm::to_vector<4>(adaptor.getOperands());
+#if 0
       (void)copyUnrankedDescriptors(rewriter, loc, op.getOperands().getTypes(),
                                     updatedOperands,
                                     /*toDynamic=*/true);
+#endif
     }
 
     // If ReturnOp has 0 or 1 operand, create it and return immediately.

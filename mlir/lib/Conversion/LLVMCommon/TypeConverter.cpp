@@ -768,10 +768,17 @@ LLVMTypeConverter::promoteOperands(Location loc, ValueRange opOperands,
                                          promotedOperands);
         continue;
       }
-#if 0
+#if 1
       if (auto memrefType = dyn_cast<MemRefType>(operand.getType())) {
-        MemRefDescriptor::unpack(builder, loc, llvmOperand, memrefType,
-                                 promotedOperands);
+        // MemRefDescriptor::unpack(builder, loc, llvmOperand, memrefType,
+        //                          promotedOperands);
+        auto memrefStructType = llvmOperand.getType();
+        Value one = builder.create<LLVM::ConstantOp>(loc, builder.getI32Type(),
+                                               builder.getI32IntegerAttr(1));
+        Value memrefPtr = builder.create<LLVM::AllocaOp>(llvmOperand.getLoc(), 
+                        LLVM::LLVMPointerType::get(builder.getContext()), memrefStructType, one);
+        builder.create<LLVM::StoreOp>(llvmOperand.getLoc(), llvmOperand, memrefPtr);
+        promotedOperands.push_back(memrefPtr);
         continue;
       }
 #endif
@@ -796,8 +803,9 @@ mlir::structFuncArgTypeConverter(const LLVMTypeConverter &converter, Type type,
         converter.getMemRefDescriptorFields(memref, /*unpackAggregates=*/false);
     if (converted.empty())
       return failure();
-    auto structType = mlir::LLVM::LLVMStructType::getLiteral(&(converter.getContext()), converted);
-    result.push_back(structType);
+    // auto structType = mlir::LLVM::LLVMStructType::getLiteral(&(converter.getContext()), converted);
+    auto ptrType = LLVM::LLVMPointerType::get(&(converter.getContext()), memref.getMemorySpaceAsInt());
+    result.push_back(ptrType);
     //result.append(converted.begin(), converted.end());
     return success();
   }

@@ -759,6 +759,12 @@ struct MemRefCastOpLowering : public ConvertOpToLLVMPattern<memref::CastOp> {
     }
 
     if (isa<MemRefType>(srcType) && isa<UnrankedMemRefType>(dstType)) {
+      
+      MemRefDescriptor desc(adaptor.getSource());
+      rewriter.replaceOp(memRefCastOp, desc.allocatedPtr(rewriter, loc));
+
+      return success();
+
       // Casting ranked to unranked memref type
       // Set the rank in the destination from the memref type
       // Allocate space on the stack and copy the src memref descriptor
