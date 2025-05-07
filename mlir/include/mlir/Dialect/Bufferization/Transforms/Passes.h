@@ -4,6 +4,7 @@
 #include "mlir/Dialect/Bufferization/IR/BufferDeallocationOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -139,6 +140,8 @@ struct BufferResultsToOutParamsOpts {
   // Filter function; returns true if the function should be converted.
   // Defaults to true, i.e. all functions are converted.
   std::function<bool(func::FuncOp *)> filterFn = [](func::FuncOp *func) {
+    if (!func->getOperation()->hasAttr("mpu"))
+      return false;
     return true;
   };
 

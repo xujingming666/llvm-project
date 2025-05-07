@@ -255,7 +255,7 @@ def BufferResultsToOutParamsPass
               /*default=*/"false",
               "Add the attribute 'bufferize.result' to all output parameters.">,
        Option<"hoistStaticAllocs", "hoist-static-allocs", "bool",
-              /*default=*/"false", "Hoist static allocations to call sites.">,
+              /*default=*/"true", "Hoist static allocations to call sites.">,
   ];
   let dependentDialects = ["memref::MemRefDialect"];
 }
