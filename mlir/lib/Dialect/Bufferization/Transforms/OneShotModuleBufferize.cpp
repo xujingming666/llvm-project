@@ -69,6 +69,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Dialect/AuroraTarget.h"
 
 using namespace mlir;
 using namespace mlir::bufferization;
@@ -550,7 +551,7 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
     }
 
     // Change buffer return types to more precise layout maps.
-    if (options.inferFunctionResultLayout || funcOp->hasAttr("mpu"))
+    if (options.inferFunctionResultLayout || funcOp->hasAttr(MPU_KERNEL))
       foldMemRefCasts(funcOp);
   }
 

@@ -27,6 +27,7 @@
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Dialect/AuroraTarget.h"
 #include <optional>
 
 namespace mlir {
@@ -76,7 +77,7 @@ struct AllocOpLowering : public AllocLikeOpLLVMLowering {
     auto typeConverted = getTypeConverter()->getMemRefDescriptorFields(memRefType, false);
     auto memrefStructType = mlir::LLVM::LLVMStructType::getLiteral(&(getTypeConverter()->getContext()), typeConverted);
     
-    if (funcOp->hasAttr("mpu")) {
+    if (funcOp->hasAttr(MPU_KERNEL)) {
       auto allocValue = MemRefDescriptor::poison(rewriter, loc, memrefStructType);
       auto ptrType = mlir::LLVM::LLVMPointerType::get(&(getTypeConverter()->getContext()));
       mlir::Value ptrValue = rewriter.create<LLVM::IntToPtrOp>(loc, ptrType,
@@ -1532,7 +1533,7 @@ public:
     auto loc = callOp.getLoc();
     auto funcOp = callOp->getParentOfType<mlir::func::FuncOp>();
     
-    if (funcOp->hasAttr("mpu")) {
+    if (funcOp->hasAttr(MPU_KERNEL)) {
       if (StringRef::npos != callOp.getCallee().find("linalg_matmul")) {
         auto lhsSubviewOp = getSubviewOp(callOp.getOperands()[0]);
         auto rhsSubviewOp = getSubviewOp(callOp.getOperands()[1]);
@@ -1751,7 +1752,7 @@ struct SubViewOpLowering : public ConvertOpToLLVMPattern<memref::SubViewOp> {
     auto funcOp = subViewOp->getParentOfType<mlir::func::FuncOp>();
     auto loc = subViewOp->getLoc();
 
-    if (funcOp->hasAttr("mpu")) {
+    if (funcOp->hasAttr(MPU_KERNEL)) {
       rewriter.replaceOp(subViewOp, src);
       return success();
     }

@@ -6,6 +6,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Dialect/AuroraTarget.h"
 
 namespace mlir {
 class FunctionOpInterface;
@@ -140,7 +141,7 @@ struct BufferResultsToOutParamsOpts {
   // Filter function; returns true if the function should be converted.
   // Defaults to true, i.e. all functions are converted.
   std::function<bool(func::FuncOp *)> filterFn = [](func::FuncOp *func) {
-    if (!func->getOperation()->hasAttr("mpu"))
+    if (!func->getOperation()->hasAttr(MPU_KERNEL))
       return false;
     return true;
   };

@@ -24,6 +24,7 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Dialect/AuroraTarget.h"
 
 using namespace mlir;
 using namespace mlir::bufferization;
@@ -389,7 +390,7 @@ struct ExtractSliceOpInterface
       return failure();
     
     auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
-    if (!funcOp->hasAttr("mpu")) {
+    if (!funcOp->hasAttr(MPU_KERNEL)) {
       SmallVector<int64_t> staticOffsets;
       SmallVector<Value> dynamicOffsets;
       dispatchIndexOpFoldResults(mixedOffsets, dynamicOffsets, staticOffsets);
@@ -452,7 +453,11 @@ struct ExtractSliceOpInterface
         // Insert before module terminator.
         rewriter.setInsertionPoint(moduleOp.getBody(),
                                   std::prev(moduleOp.getBody()->end()));
-        func::FuncOp dmaFuncOp = rewriter.create<func::FuncOp>(moduleOp.getLoc(), funcName, libFnType);
+        
+        func::FuncOp dmaFuncOp = rewriter.create<func::FuncOp>(moduleOp.getLoc(), funcName, libFnType,
+                                  llvm::ArrayRef<mlir::NamedAttribute> {
+                                    rewriter.getNamedAttr("dso_local", rewriter.getUnitAttr())
+                                  });
         dmaFuncOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
                         UnitAttr::get(dmaFuncOp->getContext()));
         dmaFuncOp.setPrivate();
@@ -765,7 +770,7 @@ struct InsertSliceOpInterface
       return failure();
     
     auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
-    if (!funcOp->hasAttr("mpu")) {
+    if (!funcOp->hasAttr(MPU_KERNEL)) {
       SmallVector<int64_t> staticOffsets;
       SmallVector<Value> dynamicOffsets;
       dispatchIndexOpFoldResults(mixedOffsets, dynamicOffsets, staticOffsets);
@@ -829,7 +834,10 @@ struct InsertSliceOpInterface
         // Insert before module terminator.
         rewriter.setInsertionPoint(moduleOp.getBody(),
                                   std::prev(moduleOp.getBody()->end()));
-        func::FuncOp dmaFuncOp = rewriter.create<func::FuncOp>(moduleOp.getLoc(), funcName, libFnType);
+        func::FuncOp dmaFuncOp = rewriter.create<func::FuncOp>(moduleOp.getLoc(), funcName, libFnType,
+                                  llvm::ArrayRef<mlir::NamedAttribute> {
+                                    rewriter.getNamedAttr("dso_local", rewriter.getUnitAttr())
+                                  });
         dmaFuncOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
                         UnitAttr::get(dmaFuncOp->getContext()));
         dmaFuncOp.setPrivate();
